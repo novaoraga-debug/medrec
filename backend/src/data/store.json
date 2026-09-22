@@ -1,0 +1,569 @@
+{
+  "users": [
+    {
+      "id": "USR-9001",
+      "email": "super.admin@medrec.local",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "phone": "",
+      "role": "super_admin",
+      "passwordHash": "$2a$12$HQqJz6FA7EJ8hSK6eIF8yu44WHvXI1m4Her6Gl1SS7TuG37/hwHH6",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": true,
+      "totpSecret": "JBSWY3DPEHPK3PXP",
+      "refreshTokens": [],
+      "createdAt": "2026-09-21T07:37:46.773Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": "",
+      "clinicId": null
+    },
+    {
+      "id": "USR-9002",
+      "email": "clinic.admin@medrec.local",
+      "firstName": "Clinic",
+      "lastName": "Manager",
+      "phone": "",
+      "role": "clinic_admin",
+      "passwordHash": "$2a$12$pxdxrEY16PUxpHNWemc7qOptyzfJ.vbYMr0aNh9/CIScjPm8lf3r6",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": true,
+      "totpSecret": "JBSWY3DPEHPK3PXP",
+      "refreshTokens": [],
+      "createdAt": "2026-09-21T07:37:46.773Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": "",
+      "clinicId": "CLINIC-NAIROBI"
+    },
+    {
+      "id": "USR-2001",
+      "email": "doctor.demo@medrec.local",
+      "firstName": "Priya",
+      "lastName": "Shah",
+      "phone": "",
+      "role": "doctor",
+      "passwordHash": "$2a$12$7mNMKL4aG/2UBTBa4QnAhOCAjZLqfrcLM.m3/an/WuUzBkipJpXVy",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": true,
+      "refreshTokens": [],
+      "createdAt": "2026-09-21T07:37:46.773Z",
+      "status": "active",
+      "specialty": "General Medicine",
+      "licenseNumber": "MED-44783",
+      "clinicId": "CLINIC-NAIROBI"
+    },
+    {
+      "id": "USR-b8871a88",
+      "email": "qa.user.2026@example.com",
+      "firstName": "QA",
+      "lastName": "User",
+      "phone": "",
+      "role": "patient",
+      "passwordHash": "$2a$12$7mNMKL4aG/2UBTBa4QnAhOCAjZLqfrcLM.m3/an/WuUzBkipJpXVy",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": false,
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYWRtaW4iLCJ0eXBlIjoicmVmcmVzaCIsInN1YiI6IlVTUi1iODg3MWE4OCIsImlhdCI6MTc4OTk3NjI2NiwiZXhwIjoxNzkyNTY4MjY2fQ.TYqbU4Upnksv7r28XVnSKdV0RtCkEpbXqCawXmuxEfA",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYWRtaW4iLCJ0eXBlIjoicmVmcmVzaCIsInN1YiI6IlVTUi1iODg3MWE4OCIsImlhdCI6MTc4OTk3NjI2NywiZXhwIjoxNzkyNTY4MjY3fQ.ZdiRWpDh5k4-Ztets8Ruktc48tgki-bdqnU77bfGYPQ",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTc3ODkwLCJleHAiOjE3OTI1Njk4OTB9.0fQIVGyUsJSRLpMi7mmabj13duD5rorI4MC6pFWMi1s",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTc3ODkzLCJleHAiOjE3OTI1Njk4OTN9.akQSA_X-kl1fp7TsNJVW2h7CUeYLvgBKti_qIDi--JQ",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTgwMzUzLCJleHAiOjE3OTI1NzIzNTN9.lxd6UIxW49f_YS5Ohg8QSyMtCVYxtLYR8no8viBd5rY",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTgxMDY3LCJleHAiOjE3OTI1NzMwNjd9.aD9OSTDyDqV9AhdyUuLRQHAHxatnHXHfosRZonxngJs",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTg3NzY0LCJleHAiOjE3OTI1Nzk3NjR9.DGlcwXKdjsSCODxrN4ZhVicna__Jxoj1bQNICuLy1pw",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTg4NDI5LCJleHAiOjE3OTI1ODA0Mjl9.89u91W9PpTaNDixUWlWXQsigWZKJM8ZQICohoSLWxoM",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTg4NDcwLCJleHAiOjE3OTI1ODA0NzB9.QEaiUbaVhUl_oRxOM8x12xRujEN3xGxkSxVKCteLrQc",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTkwNDU2LCJleHAiOjE3OTI1ODI0NTZ9.n979o9mZ4E70p-4C7zakojDTnNGcAmHbJkwGk3E7zQI",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTkyMDY3LCJleHAiOjE3OTI1ODQwNjd9.pggaYiaW-jiQhRtaLMJFS0mrZPcUxWtnAVM_NOPqS7c",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTkyMjg0LCJleHAiOjE3OTI1ODQyODR9.1U6XNzy_MuSsXQdO-NXWFV8EOIuFo-s783rpI-EqopA",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTkzMjA2LCJleHAiOjE3OTI1ODUyMDZ9.e_8SFmj1tM86W50RVProjZ1hTAM9j81Ld6qNf2-dAz4",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTk2MzU3LCJleHAiOjE3OTI1ODgzNTd9.88rNvaPWPWhFPWMuv2p9uFo1nlravKQlzLqpsHCpqpg",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTk2MzkzLCJleHAiOjE3OTI1ODgzOTN9.DZYe7ZXlOTzslmLseK4Oso8KDmQbZAzp4S9KmLxk-Qg",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzg5OTk3MzY5LCJleHAiOjE3OTI1ODkzNjl9.McxTBMwPdzpImmPGUOMhPKB4SGpWAl904pSmx3_FfEE",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDAyMzMzLCJleHAiOjE3OTI1OTQzMzN9.0LX7SkC3bQkVsCMnRSm-xBGiaF134gHhPcg2Lz_wwDs",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDAzNzU3LCJleHAiOjE3OTI1OTU3NTd9._4ZHvF9AihwwU0gNmggTNY8qhvWiE98_NuTjZVopSB8",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDA5MTgyLCJleHAiOjE3OTI2MDExODJ9.tTBWXmOySIYuGGRxR_19GkGr3p4XRtd6guaXp35rWJ4",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDEwMTg4LCJleHAiOjE3OTI2MDIxODh9.2bWd82zzt6t6flTm9zjQldhHD2gvjswVw7c1Vo-0JHg",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDEwNjk2LCJleHAiOjE3OTI2MDI2OTZ9.iWXH7fRTo6gZHzoUj57YR9SJA-PwArY8yVw-YP3s8h8"
+      ],
+      "createdAt": "2026-09-21T07:37:46.773Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": ""
+    },
+    {
+      "id": "USR-7e3ac59c",
+      "email": "new.patient.260921163327@medrec.demo",
+      "firstName": "New",
+      "lastName": "Patient",
+      "phone": "",
+      "role": "patient",
+      "passwordHash": "$2a$12$H.naDPoOUAi44qexkVXQh.hXLR8Scv6fD4znQ/5Y4XOYUxJ7uMGH.",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": false,
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLTdlM2FjNTljIiwiaWF0IjoxNzg5OTg4NjA4LCJleHAiOjE3OTI1ODA2MDh9.XhOLBPxlvpa8b3j76oUn8d_YZf8AsZI5s3UqLeEdcJY"
+      ],
+      "createdAt": "2026-09-21T11:03:28.145Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": ""
+    }
+  ],
+  "patients": [
+    {
+      "id": "PT-1001",
+      "ownerId": "USR-1001",
+      "name": "Aisha Okafor",
+      "dob": "1988-04-12",
+      "gender": "female",
+      "mrn": "MRN-1204",
+      "preferredLanguage": "English",
+      "insurance": "ACME Health Plan",
+      "status": "active",
+      "homeClinic": "Nairobi Community Clinic",
+      "allergies": [
+        "Penicillin",
+        "Sulfa"
+      ],
+      "activeMeds": [
+        {
+          "name": "Metformin",
+          "dosage": "500mg",
+          "frequency": "BD"
+        },
+        {
+          "name": "Atorvastatin",
+          "dosage": "20mg",
+          "frequency": "Nightly"
+        }
+      ],
+      "vitals": {
+        "bloodPressure": "118/76",
+        "heartRate": "72 bpm",
+        "temperature": "36.8°C",
+        "oxygenSaturation": "98%"
+      },
+      "diagnoses": [
+        {
+          "code": "E11.9",
+          "title": "Type 2 diabetes mellitus"
+        },
+        {
+          "code": "I10",
+          "title": "Essential hypertension"
+        }
+      ],
+      "immunizations": [
+        "Influenza 2025",
+        "Tetanus booster"
+      ],
+      "visitHistory": [
+        {
+          "date": "2026-09-10",
+          "clinic": "Nairobi Community Clinic",
+          "reason": "Follow-up"
+        },
+        {
+          "date": "2026-08-18",
+          "clinic": "Western Referral Center",
+          "reason": "Lab review"
+        }
+      ],
+      "consent": {
+        "patientControlled": true,
+        "pendingProviders": [
+          "Dr. Priya Shah"
+        ],
+        "status": "Consent request pending",
+        "emergencyBreakGlass": "Enabled and logged"
+      }
+    }
+  ],
+  "doctors": [
+    {
+      "id": "DR-2001",
+      "userId": "USR-2001",
+      "name": "Dr. Priya Shah",
+      "specialty": "General Medicine",
+      "licenseNumber": "MED-44783",
+      "affiliation": "Nairobi Partners Clinic",
+      "verified": true,
+      "verificationStatus": "approved",
+      "roles": [
+        "Doctor"
+      ],
+      "qrToken": "medrec-verified-DR-2001-2026"
+    }
+  ],
+  "prescriptions": [
+    {
+      "id": "RX-1001",
+      "patientId": "PT-1001",
+      "doctorId": "DR-2001",
+      "original": "Amoxicillin 500mg twice daily for 5 days",
+      "cleaned": {
+        "drug": "Amoxicillin",
+        "dosage": "500 mg",
+        "frequency": "twice daily",
+        "duration": "5 days",
+        "instructions": "Finish the full course unless directed otherwise."
+      },
+      "status": "pending-confirmation",
+      "source": "manual-entry",
+      "createdAt": "2026-09-21T09:15:00.000Z"
+    }
+  ],
+  "consents": [
+    {
+      "id": "CR-1",
+      "patientId": "PT-1001",
+      "actorId": "USR-2001",
+      "actorRole": "doctor",
+      "provider": "Dr. Priya Shah",
+      "purpose": "Referral summary for cardiology follow-up",
+      "status": "approved",
+      "createdAt": "2026-09-21T08:40:00.000Z",
+      "expiresAt": "2026-09-28T08:40:00.000Z"
+    }
+  ],
+  "consentRequests": [],
+  "notifications": [
+    {
+      "id": "N-1",
+      "type": "prescription",
+      "title": "Prescription ready",
+      "channel": "SMS",
+      "message": "Your prescription is ready for collection at Nairobi Partners Clinic.",
+      "read": false
+    },
+    {
+      "id": "N-2",
+      "type": "consent",
+      "title": "Access request",
+      "channel": "Push",
+      "message": "Dr. Priya Shah is requesting access to your referral data.",
+      "read": false
+    },
+    {
+      "id": "N-3",
+      "type": "appointment",
+      "title": "Follow-up booked",
+      "channel": "Email",
+      "message": "Your diabetes review is scheduled for 2026-09-30.",
+      "read": true
+    }
+  ],
+  "referrals": [
+    {
+      "id": "RF-1",
+      "patientId": "PT-1001",
+      "to": "Cardiology Unit",
+      "reason": "BP evaluation and medication adjustment",
+      "summary": "Patient has controlled diabetes with elevated blood pressure. Includes baseline vitals and active diagnoses.",
+      "status": "sent"
+    }
+  ],
+  "labs": [
+    {
+      "id": "LB-1",
+      "patientId": "PT-1001",
+      "date": "2026-09-16",
+      "name": "HbA1c",
+      "result": "7.1%",
+      "status": "requires-signoff"
+    },
+    {
+      "id": "LB-2",
+      "patientId": "PT-1001",
+      "date": "2026-09-16",
+      "name": "Lipid Panel",
+      "result": "Total cholesterol 176 mg/dL",
+      "status": "verified"
+    }
+  ],
+  "payments": [
+    {
+      "id": "PY-1",
+      "patientId": "PT-1001",
+      "visitDate": "2026-09-21",
+      "status": "insured",
+      "coveredBy": "ACME Health Plan",
+      "amount": 120
+    },
+    {
+      "id": "PY-2",
+      "patientId": "PT-1001",
+      "visitDate": "2026-08-18",
+      "status": "subsidized",
+      "coveredBy": "Community Subsidy Program",
+      "amount": 55
+    }
+  ],
+  "audit": [
+    {
+      "id": "AUD-3f3d8e1e",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T17:11:36.842Z"
+    },
+    {
+      "id": "AUD-71abb9d4",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T17:03:08.514Z"
+    },
+    {
+      "id": "AUD-c791f9ac",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T16:46:22.277Z"
+    },
+    {
+      "id": "AUD-79dbb809",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T15:15:57.166Z"
+    },
+    {
+      "id": "AUD-5213ec6c",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T14:52:13.827Z"
+    },
+    {
+      "id": "AUD-6d4cafc8",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T13:29:29.055Z"
+    },
+    {
+      "id": "AUD-f69bec63",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T13:13:13.488Z"
+    },
+    {
+      "id": "AUD-5af2cf9f",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T13:12:37.778Z"
+    },
+    {
+      "id": "AUD-f5bc351d",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T12:20:06.441Z"
+    },
+    {
+      "id": "AUD-17cd48ab",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T12:04:44.030Z"
+    },
+    {
+      "id": "AUD-6b014dfe",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T12:01:07.101Z"
+    },
+    {
+      "id": "AUD-505b7f69",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T11:34:16.808Z"
+    },
+    {
+      "id": "AUD-8f70210d",
+      "actor": "USR-7e3ac59c",
+      "action": "register-account",
+      "resource": "users",
+      "reason": "first-time-account-creation",
+      "status": "success",
+      "timestamp": "2026-09-21T11:03:28.149Z"
+    },
+    {
+      "id": "AUD-0808e636",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T11:01:10.255Z"
+    },
+    {
+      "id": "AUD-b40c79f8",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T11:00:29.326Z"
+    },
+    {
+      "id": "AUD-b05b5cd7",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T10:49:24.951Z"
+    },
+    {
+      "id": "AUD-43dc4eb6",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T08:57:47.341Z"
+    },
+    {
+      "id": "AUD-83afb908",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T08:45:53.932Z"
+    },
+    {
+      "id": "AUD-48a5468f",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T08:04:53.720Z"
+    },
+    {
+      "id": "AUD-5d9d4a21",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T08:04:50.442Z"
+    },
+    {
+      "id": "AUD-5988e19d",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-21T07:37:47.349Z"
+    },
+    {
+      "id": "AUD-d4ba22c7",
+      "actor": "USR-b8871a88",
+      "action": "register-account",
+      "resource": "users",
+      "reason": "first-time-account-creation",
+      "status": "success",
+      "timestamp": "2026-09-21T07:37:46.793Z"
+    },
+    {
+      "id": "AUD-1",
+      "actor": "Dr. Priya Shah",
+      "action": "Viewed patient record",
+      "resource": "patients/PT-1001",
+      "reason": "routine-access",
+      "timestamp": "2026-09-21T09:32:00.000Z",
+      "status": "success"
+    },
+    {
+      "id": "AUD-2",
+      "actor": "Aisha Okafor",
+      "action": "Granted provider consent",
+      "resource": "consents/CR-1",
+      "reason": "patient-consent",
+      "timestamp": "2026-09-20T15:10:00.000Z",
+      "status": "success"
+    },
+    {
+      "id": "AUD-3",
+      "actor": "Pharmacy team",
+      "action": "Requested prescription confirmation",
+      "resource": "prescriptions/RX-1001",
+      "reason": "dispensing-review",
+      "timestamp": "2026-09-21T09:16:00.000Z",
+      "status": "success"
+    }
+  ],
+  "analytics": {
+    "dailyVolume": 38,
+    "diagnosisBreakdown": [
+      {
+        "label": "Diabetes",
+        "value": 26
+      },
+      {
+        "label": "Hypertension",
+        "value": 19
+      },
+      {
+        "label": "Respiratory",
+        "value": 12
+      }
+    ],
+    "prescriptionPatterns": [
+      {
+        "label": "Antibiotics",
+        "value": 11
+      },
+      {
+        "label": "Insulin",
+        "value": 7
+      },
+      {
+        "label": "Pain management",
+        "value": 9
+      }
+    ]
+  },
+  "syncQueue": [],
+  "breakGlass": [],
+  "queue": []
+}

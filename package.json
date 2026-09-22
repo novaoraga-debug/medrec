@@ -1,0 +1,12 @@
+{
+  "name": "medrec",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix backend",
+    "dev": "npm run dev --prefix backend",
+    "start": "npm run start --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
