@@ -11,9 +11,17 @@ const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
 const { OAuth2Client } = require('google-auth-library');
-const { authenticator } = require('otplib');
+const { verifySync, createGuardrails } = require('otplib');
 const { v4: uuid } = require('uuid');
 const { readData, writeData } = require('./store');
+
+// Express 4 does not catch rejected promises returned by async route handlers,
+// so a single escaping error (e.g. during MFA verification) would otherwise
+// exit the whole process. Log it and keep serving.
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error(`[unhandledRejection] ${message}`);
+});
 
 require('dotenv').config();
 
@@ -34,22 +42,85 @@ const ADMIN_ATTEMPT_TRACKER = new Map();
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_, __, cb) => cb(null, uploadDir),
-    filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`)
-  })
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, uploadDir),
+  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`)
 });
 
-app.use(helmet());
+const prescriptionUpload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+  fileFilter: (_, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG, WebP, HEIC, or PDF prescription files are allowed.'));
+  }
+});
+
+// Authenticated, audit-logged file access. <img>/<a> tags cannot send headers,
+// so the browser first exchanges its session token for a short-lived,
+// file-scoped token (POST /api/files/token) and loads the file with
+// ?file_token=. A full session token is never accepted in a query string, so
+// it cannot leak through URLs, server logs, or browser history.
+const FILE_TOKEN_TTL = process.env.FILE_TOKEN_TTL || '5m';
+
+function issueFileToken(userPayload, filename) {
+  return jwt.sign({ ...userPayload, purpose: 'file', file: filename }, JWT_SECRET, { expiresIn: FILE_TOKEN_TTL });
+}
+
+function verifyFileToken(token, filename) {
+  const payload = jwt.verify(token, JWT_SECRET);
+  if (payload.purpose !== 'file' || payload.file !== filename) {
+    throw new Error('File token does not match this file.');
+  }
+  return payload;
+}
+
+function isSafeFilename(filename) {
+  return /^[A-Za-z0-9._-]+$/.test(filename) && !filename.includes('..');
+}
+
+// Global middleware is registered before any route so helmet headers, CORS,
+// logging, body parsing, and rate limits cover EVERY endpoint — the file and
+// OCR routes below previously bypassed all of them.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      'script-src': ["'self'", 'https://accounts.google.com'],
+      'frame-src': ["'self'", 'https://accounts.google.com'],
+      'connect-src': ["'self'", 'https://accounts.google.com'],
+      'img-src': ["'self'", 'data:', 'blob:']
+    }
+  },
+  // The portals run on their own origins and load API responses (images
+  // included), so cross-origin resources must be allowed.
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('combined'));
-app.use(express.static(path.join(__dirname, '../../frontend')));
-
-app.get('/', (_, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+// morgan logs the full URL; redact token query parameters so short-lived file
+// tokens (and any stray access_token) never land in request logs.
+const TOKEN_QUERY_RE = /([?&](?:file_token|access_token)=)[^&\s]+/gi;
+app.use(morgan((_, req, res) => {
+  const url = String(req.originalUrl || req.url || '').replace(TOKEN_QUERY_RE, '$1[redacted]');
+  const status = res.headersSent ? String(res.statusCode) : '-';
+  const durationMs = req._startAt && res._startAt
+    ? ((res._startAt[0] - req._startAt[0]) * 1e3 + (res._startAt[1] - req._startAt[1]) * 1e-6).toFixed(3)
+    : '-';
+  const ip = req.ip || (req.socket && req.socket.remoteAddress) || '-';
+  const agent = req.headers['user-agent'] || '-';
+  return `${ip} - - "${req.method} ${url} HTTP/${req.httpVersion}" ${status} - "${req.headers.referer || '-'}" "${agent}" ${durationMs} ms`;
+}));
+// Layered rate limits: a generous global ceiling for everything (registered
+// before static/routes), a stricter per-minute budget for API traffic, plus
+// the tighter auth/QR route limiters.
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down and try again.' }
 });
 
 const auditLimiter = rateLimit({
@@ -65,6 +136,92 @@ const qrLimiter = rateLimit({
   max: 20,
   message: { error: 'Public QR verification rate limit reached.' }
 });
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please wait and try again.' }
+});
+
+app.use(globalLimiter);
+app.use('/api', auditLimiter);
+
+app.use(express.static(path.join(__dirname, '../../frontend')));
+
+app.get('/', (_, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+});
+
+app.use((req, _, next) => {
+  req.accessReason = req.headers['x-access-reason'] || 'routine-access';
+  next();
+});
+
+// Mint a short-lived token scoped to a single upload, for <img>/<a> loads.
+app.post('/api/files/token', requireAuth, (req, res) => {
+  const rawFilename = String(req.body?.filename || '');
+  if (!isSafeFilename(rawFilename)) {
+    return res.status(400).json({ error: 'Invalid file name.' });
+  }
+  const filename = path.basename(rawFilename);
+
+  const filePath = path.join(uploadDir, filename);
+  if (!filePath.startsWith(uploadDir) || !fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found.' });
+  }
+
+  const fileToken = issueFileToken({ sub: req.user.sub, role: req.user.role }, filename);
+  logAccess({ actor: req.user.sub, action: 'issue-file-token', resource: `uploads/${filename}`, reason: 'record-access' });
+  res.json({ fileToken, expiresIn: FILE_TOKEN_TTL });
+});
+
+function resolveUploadToken(req) {
+  const header = req.headers.authorization || '';
+  if (header.startsWith('Bearer ')) return { kind: 'access', token: header.slice(7) };
+  if (req.query.file_token) return { kind: 'file', token: String(req.query.file_token) };
+  return { kind: null, token: null };
+}
+
+app.get('/api/files/:filename', (req, res) => {
+  // Reject path traversal on the raw (URL-decoded) input before normalizing.
+  const rawFilename = String(req.params.filename);
+  if (!isSafeFilename(rawFilename)) {
+    return res.status(400).json({ error: 'Invalid file name.' });
+  }
+  const filename = path.basename(rawFilename);
+
+  const { kind, token } = resolveUploadToken(req);
+  if (!token) return res.status(401).json({ error: 'Authentication required.' });
+
+  try {
+    req.user = kind === 'file'
+      ? verifyFileToken(token, filename)
+      : verifyAccessToken(token);
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired access token.' });
+  }
+
+  const filePath = path.join(uploadDir, filename);
+  if (!filePath.startsWith(uploadDir) || !fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found.' });
+  }
+
+  logAccess({ actor: req.user.sub, action: 'view-file', resource: `uploads/${filename}`, reason: 'record-access' });
+  res.sendFile(filePath);
+});
+
+// Health check for the prescription OCR pipeline.
+app.get('/api/prescriptions/ocr-status', requireAuth, (req, res) => {
+  res.json({
+    engine: 'medrec-structured-parser',
+    version: 1,
+    capabilities: ['medication-fuzzy-match', 'frequency-abbreviations', 'field-confidence'],
+    note: 'OCR drafts are assistive only and always require human verification.'
+  });
+});
+const applicationUpload = multer({ storage, limits: { files: 5, fileSize: 8 * 1024 * 1024 } });
 
 function makeId(prefix) {
   return `${prefix}-${uuid().slice(0, 8)}`;
@@ -85,7 +242,10 @@ function issueToken(subject, payload, secret, expiresIn) {
 }
 
 function verifyAccessToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+  const payload = jwt.verify(token, JWT_SECRET);
+  // File-scoped tokens (?file_token=) must never authenticate regular API calls.
+  if (payload.purpose === 'file') throw new Error('File tokens are not access tokens.');
+  return payload;
 }
 
 function verifyRefreshToken(token) {
@@ -310,25 +470,133 @@ function consentActiveFor(patientId, actorRole, actorId, data = readData()) {
   return Boolean(activeConsent || patient.ownerId === actorId);
 }
 
+const KNOWN_MEDICATIONS = [
+  'amoxicillin', 'metformin', 'ibuprofen', 'paracetamol', 'acetaminophen', 'atorvastatin',
+  'salbutamol', 'albuterol', 'cetirizine', 'insulin', 'azithromycin', 'lisinopril',
+  'amlodipine', 'omeprazole', 'prednisone', 'warfarin', 'gabapentin', 'sertraline'
+];
+
+const FREQUENCY_MAP = [
+  // Longer, more specific phrases must be checked before bare "daily"/"od",
+  // otherwise "twice daily" would be swallowed by the generic daily rule.
+  { pattern: /\b(bd|bid|twice daily|2\s*x\s*(a\s*)?day)\b/i, normalized: 'twice daily', confidence: 0.9 },
+  { pattern: /\b(tds|tid|three times daily|3\s*x\s*(a\s*)?day)\b/i, normalized: 'three times daily', confidence: 0.9 },
+  { pattern: /\b(qds|qid|four times daily|4\s*x\s*(a\s*)?day)\b/i, normalized: 'four times daily', confidence: 0.9 },
+  { pattern: /\b(od|once daily|1\s*x\s*(a\s*)?day)\b/i, normalized: 'once daily', confidence: 0.9 },
+  { pattern: /\b(prn|as needed)\b/i, normalized: 'as needed', confidence: 0.85 },
+  { pattern: /\b(every\s+\d+\s*(hours|hrs))\b/i, normalized: null, confidence: 0.9 },
+  { pattern: /\bdaily\b/i, normalized: 'once daily', confidence: 0.8 },
+  { pattern: /\b(morning|night|evening|nocte|mane)\b/i, normalized: null, confidence: 0.7 }
+];
+
+// Levenshtein distance used for fuzzy medication-name matching (OCR typos).
+function levenshtein(a, b) {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  let prev = Array.from({ length: cols }, (_, i) => i);
+  for (let i = 1; i < rows; i += 1) {
+    const curr = [i];
+    for (let j = 1; j < cols; j += 1) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = curr;
+  }
+  return prev[cols - 1];
+}
+
+function matchMedicationName(word) {
+  const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+  if (!clean || clean.length < 3) return null;
+  const exact = KNOWN_MEDICATIONS.find((med) => med === clean);
+  if (exact) return { name: exact, confidence: 0.95, distance: 0 };
+  let best = null;
+  for (const med of KNOWN_MEDICATIONS) {
+    const distance = levenshtein(clean, med);
+    const tolerance = med.length >= 8 ? 2 : 1;
+    if (distance <= tolerance && (!best || distance < best.distance)) {
+      best = { name: med, confidence: Math.max(0.5, 0.9 - distance * 0.2), distance };
+    }
+  }
+  return best;
+}
+
+// Structured transcription of free prescription text. Every field carries a
+// confidence so the pharmacist UI can flag low-certainty readings for review.
 function cleanPrescription(rawText) {
   const text = rawText || '';
   const lines = text.split(/\n|;/).map((line) => line.trim()).filter(Boolean);
-  const medicationMatch = lines.find((line) => /(amoxicillin|metformin|ibuprofen|paracetamol|atorvastatin|salbutamol|cetirizine|insulin|azithromycin)/i.test(line));
+  const warnings = [];
+
+  let medicationMatch = null;
+  for (const line of lines) {
+    const tokens = line.split(/\s+/);
+    for (const token of tokens) {
+      const match = matchMedicationName(token);
+      if (match) {
+        medicationMatch = { line, token, match };
+        break;
+      }
+    }
+    if (medicationMatch) break;
+  }
+
   const dosageMatch = lines.find((line) => /\d+\s*(mg|mcg|g|ml|iu|tablet|capsule)/i.test(line));
-  const frequencyMatch = lines.find((line) => /(twice|daily|bd|od|tid|qid|every\s+\d+\s*hours|morning|night)/i.test(line));
+  let frequency = null;
+  let frequencyConfidence = 0;
+  for (const rule of FREQUENCY_MAP) {
+    const found = lines.find((line) => rule.pattern.test(line));
+    if (found) {
+      const raw = found.match(rule.pattern)?.[0] || '';
+      frequency = rule.normalized || raw.toLowerCase();
+      frequencyConfidence = rule.confidence;
+      if (!rule.normalized) {
+        frequency = frequency.match(/every\s+\d+\s*(hours|hrs)/i)?.[0] || frequency;
+      }
+      break;
+    }
+  }
   const durationMatch = lines.find((line) => /(for\s+\d+\s*(days|weeks|months)|\d+\s*(days|weeks|months))/i.test(line));
 
-  const drug = medicationMatch ? medicationMatch.split(/\s+(?=\d)/)[0].replace(/[^a-zA-Z]/g, '') : 'Medication';
+  let drug = 'Medication';
+  let drugConfidence = 0.2;
+  if (medicationMatch) {
+    drug = medicationMatch.match.name;
+    drugConfidence = medicationMatch.match.confidence;
+    if (medicationMatch.match.distance > 0) {
+      warnings.push(`Medication name "${medicationMatch.token}" was read as "${drug}" — verify against the original.`);
+    }
+  } else {
+    // Fall back to the legacy leading-token heuristic for unknown drugs.
+    const fallback = lines.find((line) => /\d/.test(line)) || lines[0] || '';
+    const token = fallback.split(/\s+(?=\d)/)[0].replace(/[^a-zA-Z]/g, '');
+    if (token) {
+      drug = token.toLowerCase();
+      drugConfidence = 0.3;
+      warnings.push(`Medication name "${token}" is not in the recognized formulary — manual verification required.`);
+    }
+  }
+
+  if (!dosageMatch) warnings.push('Dosage not clearly detected — confirm the dose before dispensing.');
+  if (!frequency) warnings.push('Frequency not detected — confirm how often the medication is taken.');
+  if (!durationMatch) warnings.push('Duration not detected — confirm the treatment length.');
+
   const dosage = dosageMatch ? dosageMatch.match(/\d+\s*(?:mg|mcg|g|ml|iu|tablet|capsule)/i)?.[0] || 'standard dose' : 'standard dose';
-  const frequency = frequencyMatch ? frequencyMatch.match(/(twice|daily|bd|od|tid|qid|every\s+\d+\s*hours|morning|night)/i)?.[0] || 'as directed' : 'as directed';
   const duration = durationMatch ? durationMatch.match(/(for\s+\d+\s*(?:days|weeks|months)|\d+\s*(?:days|weeks|months))/i)?.[0] || 'duration not specified' : 'duration not specified';
+
+  const confidence = Math.round(((drugConfidence * 2) + (dosageMatch ? 0.9 : 0.2) + (frequencyConfidence || 0.2) + (durationMatch ? 0.9 : 0.2)) / 5 * 100) / 100;
 
   return {
     drug: drug.charAt(0).toUpperCase() + drug.slice(1),
     dosage,
-    frequency: frequency.toLowerCase(),
+    frequency: frequency || 'as directed',
     duration: duration.toLowerCase(),
-    instructions: 'AI-assisted transcription — pending confirmation. Clinician review required before dispensing.'
+    instructions: 'AI-assisted transcription — pending confirmation. Clinician review required before dispensing.',
+    confidence,
+    warnings
   };
 }
 
@@ -515,18 +783,11 @@ function queueOfflineSyncEntry(data, payload = {}) {
   return normalized;
 }
 
-app.use((req, _, next) => {
-  req.accessReason = req.headers['x-access-reason'] || 'routine-access';
-  next();
-});
-
-app.use('/api', auditLimiter);
-
 app.get('/api/health', (_, res) => {
   res.json({ status: 'ok', timestamp: nowIso() });
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { email, password, role = 'patient', firstName, lastName, phone, specialty, licenseNumber } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
@@ -581,10 +842,10 @@ app.post('/api/auth/register', async (req, res) => {
   writeData(data);
 
   logAccess({ actor: user.id, action: 'register-account', resource: 'users', reason: 'first-time-account-creation' });
-  res.status(201).json({ user: userRecord, accessToken, refreshToken });
+  res.status(201).json({ user: userRecord, accessToken, refreshToken, expiresInSeconds: 15 * 60 });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authLimiter, (req, res) => {
   const { email, password } = req.body;
   const data = readData();
   const user = data.users.find((entry) => entry.email.toLowerCase() === String(email).toLowerCase());
@@ -600,37 +861,65 @@ app.post('/api/auth/login', (req, res) => {
   writeData(data);
 
   logAccess({ actor: user.id, action: 'login', resource: 'auth', reason: 'user-login' });
-  res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+  res.json({ user: sanitizeUser(user), accessToken, refreshToken, expiresInSeconds: 15 * 60 });
 });
 
-app.post('/api/auth/google', async (req, res) => {
+// Only these roles may self-serve with Google. Privileged roles must use their
+// dedicated flows: doctors go through application review, admins use MFA login.
+const GOOGLE_SELF_SERVICE_ROLES = ['patient', 'pharmacist'];
+const PRIVILEGED_ROLES = ['doctor', 'admin', 'super_admin', 'clinic_admin'];
+
+app.get('/api/auth/providers', (_, res) => {
+  res.json({
+    google: {
+      enabled: Boolean(process.env.GOOGLE_CLIENT_ID),
+      clientId: process.env.GOOGLE_CLIENT_ID || null
+    },
+    password: true
+  });
+});
+
+app.post('/api/auth/google', authLimiter, async (req, res) => {
   const { idToken, role, firstName, lastName, phone } = req.body;
   if (!idToken) {
     return res.status(400).json({ error: 'Google ID token is required.' });
   }
 
+  const requestedRole = String(role || 'patient').toLowerCase();
+  if (PRIVILEGED_ROLES.includes(requestedRole)) {
+    if (requestedRole === 'doctor') {
+      return res.status(403).json({ error: 'Doctor accounts require verification. Please apply through the doctor portal.' });
+    }
+    return res.status(403).json({ error: 'This role cannot be used with Google sign-in.' });
+  }
+  if (!GOOGLE_SELF_SERVICE_ROLES.includes(requestedRole)) {
+    return res.status(403).json({ error: 'Unsupported role for Google sign-in.' });
+  }
+
   try {
     const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
-    if (!payload?.email) {
-      return res.status(401).json({ error: 'Google token missing verified email.' });
+    if (!payload?.email || payload.email_verified === false) {
+      return res.status(401).json({ error: 'Google token missing a verified email.' });
     }
 
     const data = readData();
-    let user = data.users.find((entry) => entry.email.toLowerCase() === payload.email.toLowerCase());
+    const emailLower = String(payload.email).toLowerCase();
+    let user = data.users.find((entry) => entry.email.toLowerCase() === emailLower);
+    let isNewUser = false;
 
     if (!user) {
       user = {
         id: makeId('USR'),
-        email: payload.email.toLowerCase(),
+        email: emailLower,
         firstName: firstName || payload.given_name || 'Google',
         lastName: lastName || payload.family_name || 'User',
         phone: phone || '',
-        role: role || 'patient',
-        passwordHash: hashPassword(Math.random().toString(36).slice(2) + 'A1!'),
+        role: requestedRole,
+        passwordHash: hashPassword(`${crypto.randomBytes(24).toString('hex')}A1!`),
         provider: 'google',
         verifiedEmail: true,
-        mfaEnabled: role === 'doctor' || role === 'admin',
+        mfaEnabled: false,
         refreshTokens: [],
         createdAt: nowIso(),
         status: 'active',
@@ -638,13 +927,22 @@ app.post('/api/auth/google', async (req, res) => {
         licenseNumber: ''
       };
       data.users.push(user);
+      isNewUser = true;
+    } else {
+      const existingRole = String(user.role || '').toLowerCase();
+      // A Google login must never escalate or change an existing account's role.
+      if (PRIVILEGED_ROLES.includes(existingRole)) {
+        return res.status(403).json({ error: 'This role cannot sign in with Google. Use the correct portal.' });
+      }
+      if (existingRole !== requestedRole) {
+        return res.status(403).json({ error: 'This account is registered with a different role. Use the correct portal.' });
+      }
+      user.provider = user.provider === 'email' ? 'email+google' : user.provider;
+      user.firstName = firstName || user.firstName || payload.given_name || 'Google';
+      user.lastName = lastName || user.lastName || payload.family_name || 'User';
+      user.phone = phone || user.phone || '';
+      user.verifiedEmail = true;
     }
-
-    user.provider = user.provider === 'email' ? 'email+google' : user.provider;
-    user.role = role || user.role || 'patient';
-    user.firstName = firstName || user.firstName || payload.given_name || 'Google';
-    user.lastName = lastName || user.lastName || payload.family_name || 'User';
-    user.phone = phone || user.phone || '';
 
     const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
     const refreshToken = issueToken(user.id, { role: user.role, type: 'refresh' }, REFRESH_SECRET, '30d');
@@ -652,8 +950,14 @@ app.post('/api/auth/google', async (req, res) => {
     user.refreshTokens.push(refreshToken);
     writeData(data);
 
-    logAccess({ actor: user.id, action: 'google-login', resource: 'auth', reason: 'oauth-authorized' });
-    res.json({ user: sanitizeUser(user), accessToken, refreshToken, onboardingRequired: !user.role || user.role === 'patient' ? false : false });
+    logAccess({ actor: user.id, action: isNewUser ? 'google-register' : 'google-login', resource: 'auth', reason: 'oauth-authorized' });
+    res.status(isNewUser ? 201 : 200).json({
+      user: sanitizeUser(user),
+      accessToken,
+      refreshToken,
+      expiresInSeconds: 15 * 60,
+      isNewUser
+    });
   } catch (error) {
     console.error('Google OAuth verification failed', error);
     res.status(401).json({ error: 'Google sign-in verification failed.' });
@@ -725,7 +1029,24 @@ app.post('/api/admin/login', enforceAdminRateLimit, async (req, res) => {
     return res.status(401).json({ error: 'MFA required', requiresMfa: true });
   }
 
-  if (!candidate.totpSecret || !authenticator.check(mfaCode, candidate.totpSecret)) {
+  // otplib v13 removed the v12 authenticator.check API; verifySync returns
+  // { valid }. The seeded demo secrets are short base32 strings, so relax the
+  // RFC minimum-length guardrail, and treat any thrown error as an invalid
+  // code — as an async Express 4 handler, an escaping rejection kills the
+  // whole process.
+  let mfaValid = false;
+  try {
+    mfaValid = Boolean(candidate.totpSecret && verifySync({
+      token: mfaCode,
+      secret: candidate.totpSecret,
+      epochTolerance: 30,
+      guardrails: createGuardrails({ MIN_SECRET_BYTES: 10 })
+    })?.valid);
+  } catch {
+    mfaValid = false;
+  }
+
+  if (!mfaValid) {
     registerAdminFailure(ip, email, userAgent);
     logAdminAttempt({ email, ip, userAgent, success: false, reason: 'invalid-mfa' });
     return res.status(401).json({ error: 'Invalid MFA code' });
@@ -778,6 +1099,122 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   res.json({ user: sanitizeUser(user) });
 });
 
+function collectUploadedDocuments(files = []) {
+  return files.map((file) => ({
+    filename: file.filename,
+    originalName: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+    url: `/uploads/${file.filename}`,
+    uploadedAt: nowIso()
+  }));
+}
+
+function doctorNameFrom(firstName, lastName) {
+  const name = `${firstName || 'Doctor'} ${lastName || 'User'}`.trim();
+  return name.toLowerCase().startsWith('dr.') ? name : `Dr. ${name}`;
+}
+
+// Public: submit a verification application. No login account is created here.
+app.post('/api/doctors/apply', applicationUpload.array('documents', 5), (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+  const firstName = String(req.body.firstName || '').trim();
+  const lastName = String(req.body.lastName || '').trim();
+  const licenseNumber = String(req.body.licenseNumber || '').trim();
+
+  if (!email || !password || !firstName || !lastName || !licenseNumber) {
+    return res.status(400).json({ error: 'Name, email, password, and license number are required.' });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+
+  const data = readData();
+  if (data.users.some((user) => user.email.toLowerCase() === email)) {
+    return res.status(409).json({ error: 'An account already exists for this email.' });
+  }
+
+  const existingApplication = (data.doctorApplications || []).find(
+    (application) => application.email === email && ['pending', 'under_review'].includes(application.status)
+  );
+  if (existingApplication) {
+    return res.status(409).json({ error: 'An application for this email is already awaiting review.' });
+  }
+
+  const documents = collectUploadedDocuments(req.files || []);
+  const application = {
+    id: makeId('APP'),
+    firstName,
+    lastName,
+    name: doctorNameFrom(firstName, lastName),
+    email,
+    passwordHash: hashPassword(password),
+    specialty: String(req.body.specialty || 'General Medicine').trim() || 'General Medicine',
+    licenseNumber,
+    affiliation: String(req.body.affiliation || 'Pending verification').trim() || 'Pending verification',
+    clinicId: req.body.clinicId || 'CLINIC-NAIROBI',
+    phone: req.body.phone || '',
+    documents,
+    status: 'pending',
+    submittedAt: nowIso(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: null,
+    createdUserId: null,
+    createdDoctorId: null
+  };
+
+  data.doctorApplications = [...(data.doctorApplications || []), application];
+  writeData(data);
+
+  logAccess({ actor: application.id, action: 'submit-doctor-application', resource: `doctorApplications/${application.id}`, reason: 'doctor-verification-request' });
+
+  res.status(201).json({
+    application: {
+      id: application.id,
+      name: application.name,
+      email: application.email,
+      specialty: application.specialty,
+      licenseNumber: application.licenseNumber,
+      affiliation: application.affiliation,
+      status: application.status,
+      documents: application.documents,
+      submittedAt: application.submittedAt
+    },
+    message: 'Application submitted. A staff administrator will review your documents before your account is created.'
+  });
+});
+
+// Public: check the status of a submitted application.
+app.get('/api/doctors/apply/status', (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ error: 'Email query is required.' });
+  }
+
+  const data = readData();
+  const application = (data.doctorApplications || [])
+    .filter((entry) => entry.email === email)
+    .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
+
+  if (!application) {
+    return res.status(404).json({ error: 'No application found for this email.' });
+  }
+
+  res.json({
+    id: application.id,
+    name: application.name,
+    status: application.status,
+    submittedAt: application.submittedAt,
+    reviewedAt: application.reviewedAt,
+    rejectionReason: application.rejectionReason,
+    accountCreated: Boolean(application.createdUserId)
+  });
+});
+
+// Kept for backward compatibility: an already-authenticated doctor can register a doctor record.
 app.post('/api/doctors/register', requireAuth, (req, res) => {
   const data = readData();
   const doctor = {
@@ -789,7 +1226,9 @@ app.post('/api/doctors/register', requireAuth, (req, res) => {
     affiliation: req.body.affiliation || 'Pending verification',
     verificationStatus: 'pending',
     verified: false,
+    documents: [],
     documentUrl: req.body.documentUrl || '',
+    appliedAt: nowIso(),
     createdAt: nowIso()
   };
 
@@ -799,12 +1238,161 @@ app.post('/api/doctors/register', requireAuth, (req, res) => {
   res.status(201).json(doctor);
 });
 
-app.get('/api/doctors/pending', requireAuth, requireRole('admin'), (req, res) => {
+app.get('/api/doctors/pending', requireAdminAuth, (req, res) => {
   const data = readData();
   res.json(data.doctors.filter((doctor) => doctor.verificationStatus === 'pending'));
 });
 
-app.post('/api/admin/doctors/:id/approve', requireAuth, requireRole('admin'), (req, res) => {
+// Staff/admin: list doctor applications awaiting or already through review.
+app.get('/api/admin/doctor-applications', requireAdminAuth, (req, res) => {
+  const data = readData();
+  const status = req.query.status ? String(req.query.status) : null;
+  let applications = [...(data.doctorApplications || [])];
+
+  if (req.user.role === 'clinic_admin' && req.user.clinicId) {
+    applications = applications.filter((application) => !application.clinicId || application.clinicId === req.user.clinicId);
+  }
+
+  if (status) {
+    applications = applications.filter((application) => application.status === status);
+  }
+
+  applications.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+  res.json(applications.map((application) => ({
+    id: application.id,
+    name: application.name,
+    email: application.email,
+    specialty: application.specialty,
+    licenseNumber: application.licenseNumber,
+    affiliation: application.affiliation,
+    clinicId: application.clinicId,
+    status: application.status,
+    documentCount: (application.documents || []).length,
+    submittedAt: application.submittedAt,
+    reviewedAt: application.reviewedAt,
+    rejectionReason: application.rejectionReason
+  })));
+});
+
+// Staff/admin: full detail of a single application, including document links.
+app.get('/api/admin/doctor-applications/:id', requireAdminAuth, (req, res) => {
+  const data = readData();
+  const application = (data.doctorApplications || []).find((entry) => entry.id === req.params.id);
+  if (!application) return res.status(404).json({ error: 'Application not found.' });
+
+  if (req.user.role === 'clinic_admin' && req.user.clinicId && application.clinicId && application.clinicId !== req.user.clinicId) {
+    return res.status(403).json({ error: 'Clinic scope mismatch.' });
+  }
+
+  const { passwordHash, ...safeApplication } = application;
+  res.json(safeApplication);
+});
+
+// Staff/admin: approve an application -> creates the doctor account + QR + doctor record.
+app.post('/api/admin/doctor-applications/:id/approve', requireAdminAuth, (req, res) => {
+  const data = readData();
+  const application = (data.doctorApplications || []).find((entry) => entry.id === req.params.id);
+  if (!application) return res.status(404).json({ error: 'Application not found.' });
+
+  if (req.user.role === 'clinic_admin' && req.user.clinicId && application.clinicId && application.clinicId !== req.user.clinicId) {
+    return res.status(403).json({ error: 'Clinic scope mismatch.' });
+  }
+
+  if (application.status === 'approved' && application.createdUserId) {
+    return res.status(409).json({ error: 'This application has already been approved.' });
+  }
+
+  if (data.users.some((user) => user.email.toLowerCase() === application.email)) {
+    return res.status(409).json({ error: 'An account already exists for this email.' });
+  }
+
+  const clinicId = req.body.clinicId || application.clinicId || (req.user.clinicId || 'CLINIC-NAIROBI');
+
+  const user = {
+    id: makeId('USR'),
+    email: application.email,
+    firstName: application.firstName,
+    lastName: application.lastName,
+    phone: application.phone || '',
+    role: 'doctor',
+    passwordHash: application.passwordHash,
+    provider: 'email',
+    verifiedEmail: true,
+    mfaEnabled: true,
+    refreshTokens: [],
+    createdAt: nowIso(),
+    status: 'active',
+    specialty: application.specialty,
+    licenseNumber: application.licenseNumber,
+    clinicId
+  };
+  data.users.push(user);
+
+  const doctor = {
+    id: makeId('DR'),
+    userId: user.id,
+    name: application.name,
+    specialty: application.specialty,
+    licenseNumber: application.licenseNumber,
+    email: application.email,
+    affiliation: req.body.affiliation || application.affiliation,
+    clinicId,
+    verified: true,
+    verificationStatus: 'approved',
+    roles: ['Doctor'],
+    documents: application.documents || [],
+    appliedAt: application.submittedAt,
+    approvedAt: nowIso(),
+    reviewedBy: req.user.sub,
+    createdAt: nowIso()
+  };
+  doctor.qrToken = issueToken(doctor.id, { type: 'doctor-qr', doctorId: doctor.id, verified: true }, QR_SECRET, '5m');
+  data.doctors.push(doctor);
+
+  application.status = 'approved';
+  application.reviewedBy = req.user.sub;
+  application.reviewedAt = nowIso();
+  application.createdUserId = user.id;
+  application.createdDoctorId = doctor.id;
+
+  data.notifications.unshift({
+    id: makeId('NOT'),
+    patientId: null,
+    channel: 'email',
+    title: 'Doctor verification approved',
+    message: `Your MedRec doctor account has been approved. You can now sign in and generate your verification QR code.`,
+    read: false,
+    createdAt: nowIso()
+  });
+
+  writeData(data);
+  logAccess({ actor: req.user.sub, action: 'approve-doctor-application', resource: `doctorApplications/${application.id}`, reason: 'staff-verification' });
+
+  res.json({ application, doctor, user: sanitizeUser(user) });
+});
+
+// Staff/admin: reject an application with a reason.
+app.post('/api/admin/doctor-applications/:id/reject', requireAdminAuth, (req, res) => {
+  const data = readData();
+  const application = (data.doctorApplications || []).find((entry) => entry.id === req.params.id);
+  if (!application) return res.status(404).json({ error: 'Application not found.' });
+
+  if (req.user.role === 'clinic_admin' && req.user.clinicId && application.clinicId && application.clinicId !== req.user.clinicId) {
+    return res.status(403).json({ error: 'Clinic scope mismatch.' });
+  }
+
+  application.status = 'rejected';
+  application.reviewedBy = req.user.sub;
+  application.reviewedAt = nowIso();
+  application.rejectionReason = String(req.body.reason || 'Documents could not be verified.').trim();
+  writeData(data);
+
+  logAccess({ actor: req.user.sub, action: 'reject-doctor-application', resource: `doctorApplications/${application.id}`, reason: 'staff-verification' });
+  res.json(application);
+});
+
+app.post('/api/admin/doctors/:id/approve', requireAdminAuth, (req, res) => {
   const data = readData();
   const doctor = data.doctors.find((entry) => entry.id === req.params.id);
   if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
@@ -813,13 +1401,14 @@ app.post('/api/admin/doctors/:id/approve', requireAuth, requireRole('admin'), (r
   doctor.verified = true;
   doctor.affiliation = req.body.affiliation || doctor.affiliation;
   doctor.approvedAt = nowIso();
+  doctor.reviewedBy = req.user.sub;
   doctor.qrToken = issueToken(doctor.id, { type: 'doctor-qr', doctorId: doctor.id, verified: true }, QR_SECRET, '5m');
   writeData(data);
   logAccess({ actor: req.user.sub, action: 'approve-doctor', resource: `doctors/${doctor.id}`, reason: 'admin-verification' });
   res.json({ doctor });
 });
 
-app.get('/api/doctors/qr', qrLimiter, async (req, res) => {
+app.get('/api/doctors/qr', requireAuth, qrLimiter, async (req, res) => {
   const data = readData();
   const doctorId = req.query.doctorId || data.doctors.find((doc) => doc.verified)?.id;
   const doctor = data.doctors.find((entry) => entry.id === doctorId) || data.doctors[0];
@@ -1051,33 +1640,76 @@ app.post('/api/patients/:id/break-glass', requireAuth, requireRole('doctor', 'ad
   res.status(201).json({ success: true, event: logEvent });
 });
 
-app.post('/api/prescriptions/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/prescriptions/upload', requireAuth, prescriptionUpload.single('file'), (req, res) => {
   const data = readData();
   const patient = data.patients.find((entry) => entry.id === (req.body.patientId || 'PT-1001'));
   const doctor = data.doctors.find((entry) => entry.id === (req.body.doctorId || 'DR-1001')) || data.doctors[0];
 
   if (!patient) return res.status(404).json({ error: 'Patient not found.' });
+  if (!req.file) {
+    return res.status(400).json({ error: 'A prescription photo (file) is required.' });
+  }
 
-  const rawText = req.body.rawText || 'Amoxicillin 500mg twice daily for 5 days';
-  const cleaned = cleanPrescription(rawText);
-  const safety = evaluateMedicationSafety(patient, cleaned);
+  // The photo is the source of truth. Any typed text is an OCR draft or a
+  // clinician's note — it is stored as-is and always requires verification.
+  const draftText = req.body.rawText || req.body.ocrText || '';
+  const cleaned = draftText ? cleanPrescription(draftText) : null;
   const prescription = {
     id: makeId('RX'),
     patientId: patient.id,
     doctorId: doctor?.id || req.user.sub,
-    original: rawText,
-    originalImageUrl: req.file ? `/uploads/${req.file.filename}` : null,
+    original: draftText || 'Handwritten prescription captured as photo',
+    ocrRawText: draftText || null,
+    ocrConfidence: cleaned ? cleaned.confidence : 0,
+    ocrEngine: cleaned ? 'medrec-structured-parser' : 'none',
+    ocrWarnings: cleaned ? cleaned.warnings : ['No OCR draft yet — transcription pending.'],
+    originalImageUrl: `/uploads/${req.file.filename}`,
+    originalImageMimetype: req.file.mimetype,
     cleaned,
+    verifiedText: null,
+    verifiedBy: null,
+    verifiedAt: null,
+    reviewStatus: 'awaiting-ocr-review',
     status: 'pending-confirmation',
-    safety,
+    safety: null,
     createdAt: nowIso(),
     immutable: false
   };
 
+  if (cleaned) {
+    prescription.safety = evaluateMedicationSafety(patient, cleaned);
+  }
+
   data.prescriptions.push(prescription);
   writeData(data);
-  logAccess({ actor: req.user.sub, action: 'upload-prescription', resource: `prescriptions/${prescription.id}`, reason: req.accessReason });
+  logAccess({ actor: req.user.sub, action: 'upload-prescription-photo', resource: `prescriptions/${prescription.id}`, reason: req.accessReason });
   res.status(201).json(prescription);
+});
+
+// Human-verified soft copy: stores the corrected transcription alongside the
+// original photo. This — not the raw OCR draft — is the official record.
+app.post('/api/prescriptions/:id/correct', requireAuth, requireRole('doctor', 'pharmacist', 'admin'), (req, res) => {
+  const data = readData();
+  const prescription = data.prescriptions.find((entry) => entry.id === req.params.id);
+  if (!prescription) return res.status(404).json({ error: 'Prescription not found.' });
+  if (prescription.immutable) return res.status(409).json({ error: 'Confirmed prescriptions are immutable.' });
+
+  const verifiedText = String(req.body.verifiedText || '').trim();
+  if (!verifiedText) return res.status(400).json({ error: 'verifiedText is required.' });
+
+  const patient = data.patients.find((entry) => entry.id === prescription.patientId);
+  const corrected = cleanPrescription(verifiedText);
+
+  prescription.verifiedText = verifiedText;
+  prescription.cleaned = corrected;
+  prescription.verifiedBy = req.user.sub;
+  prescription.verifiedAt = nowIso();
+  prescription.reviewStatus = 'human-verified';
+  prescription.safety = evaluateMedicationSafety(patient, corrected);
+
+  writeData(data);
+  logAccess({ actor: req.user.sub, action: 'correct-prescription-transcription', resource: `prescriptions/${prescription.id}`, reason: req.accessReason });
+  res.json(prescription);
 });
 
 app.get('/api/prescriptions/:id', requireAuth, (req, res) => {

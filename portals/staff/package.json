@@ -1,0 +1,27 @@
+{
+  "name": "medrec-portal-staff",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5184",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4184"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "framer-motion": "^13.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@rollup/wasm-node": "^4.63.4",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.10"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.63.4"
+  }
+}

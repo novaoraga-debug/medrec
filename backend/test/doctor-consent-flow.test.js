@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// Isolated per-process store; must be required before the server module.
+require('./helpers/isolated-store');
 const { consentActiveFor, evaluateMedicationSafety } = require('../src/server');
 
 test('doctor consent is active when the patient has approved access for the clinician', () => {

@@ -1,5 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { generateSync, createGuardrails } = require('otplib');
+
+// Isolated per-process store; must be required before the server module so
+// admin-login audit writes do not touch the shared store.json.
+require('./helpers/isolated-store');
 const { app } = require('../src/server');
 
 async function postAdminLogin(payload) {
@@ -43,4 +48,20 @@ test('valid admin credentials require MFA before issuing a session token', async
   assert.equal(result.status, 401);
   assert.equal(result.data.error, 'MFA required');
   assert.ok(result.data.requiresMfa === true);
+});
+
+test('valid admin credentials with a live TOTP code issue a session token (otplib v13 regression)', async () => {
+  // Regression: server.js previously called the removed v12 authenticator API,
+  // which threw inside an async handler and crashed the whole process.
+  const guardrails = createGuardrails({ MIN_SECRET_BYTES: 10 });
+  const mfaCode = generateSync({ secret: 'JBSWY3DPEHPK3PXP', guardrails });
+  const result = await postAdminLogin({
+    email: 'super.admin@medrec.local',
+    password: 'SuperAdmin!2026',
+    mfaCode
+  });
+
+  assert.equal(result.status, 200);
+  assert.ok(result.data.accessToken);
+  assert.equal(result.data.user.role, 'super_admin');
 });

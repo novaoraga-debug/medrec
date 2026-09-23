@@ -2,7 +2,13 @@ const fs = require('fs');
 const path = require('path');
 
 const dataDir = path.join(__dirname, 'data');
-const dataFile = path.join(dataDir, 'store.json');
+// Tests (and any other embedder) can point the store at a private file by
+// setting MEDREC_DATA_FILE before this module is loaded. node --test runs
+// every test file in its own parallel child process, so each process uses a
+// temp data file instead of racing on backend/src/data/store.json.
+const dataFile = process.env.MEDREC_DATA_FILE
+  ? path.resolve(process.env.MEDREC_DATA_FILE)
+  : path.join(dataDir, 'store.json');
 
 const defaultData = {
   users: [
@@ -39,6 +45,24 @@ const defaultData = {
       status: 'active',
       specialty: 'General Medicine',
       licenseNumber: 'MED-44783',
+      clinicId: 'CLINIC-NAIROBI'
+    },
+    {
+      id: 'USR-3001',
+      email: 'pharmacist.demo@medrec.local',
+      firstName: 'Pharmacy',
+      lastName: 'Lead',
+      phone: '',
+      role: 'pharmacist',
+      passwordHash: '$2a$12$7mNMKL4aG/2UBTBa4QnAhOCAjZLqfrcLM.m3/an/WuUzBkipJpXVy',
+      provider: 'email',
+      verifiedEmail: true,
+      mfaEnabled: false,
+      refreshTokens: [],
+      createdAt: '2026-09-21T07:37:46.773Z',
+      status: 'active',
+      specialty: '',
+      licenseNumber: '',
       clinicId: 'CLINIC-NAIROBI'
     },
     {
@@ -128,14 +152,20 @@ const defaultData = {
       name: 'Dr. Priya Shah',
       specialty: 'General Medicine',
       licenseNumber: 'MED-44783',
+      email: 'doctor.demo@medrec.local',
       affiliation: 'Nairobi Partners Clinic',
       clinicId: 'CLINIC-NAIROBI',
       verified: true,
       verificationStatus: 'approved',
       roles: ['Doctor'],
+      documents: [],
+      appliedAt: '2026-09-20T07:37:46.773Z',
+      approvedAt: '2026-09-21T07:37:46.773Z',
+      reviewedBy: 'USR-9001',
       qrToken: 'medrec-verified-DR-2001-2026'
     }
   ],
+  doctorApplications: [],
   prescriptions: [
     {
       id: 'RX-1001',
@@ -214,13 +244,44 @@ const defaultData = {
   queue: []
 };
 
+// All writes are synchronous, so Node's single-threaded event loop already
+// serializes them within this process — that is the write lock. Writing to a
+// temp file and atomically renaming it into place guarantees a crash mid-write
+// never leaves a half-written store, and readers always see complete JSON.
+// (Concurrent multi-process writers are not supported; tests isolate via
+// MEDREC_DATA_FILE.)
+function writeFileAtomic(targetFile, contents) {
+  const tempFile = `${targetFile}.${process.pid}.tmp`;
+  fs.writeFileSync(tempFile, contents, 'utf8');
+  try {
+    fs.renameSync(tempFile, targetFile);
+  } catch (error) {
+    try { fs.unlinkSync(tempFile); } catch { /* temp already gone */ }
+    throw error;
+  }
+}
+
+// One-time best-effort cleanup of temp files a previous crash left behind.
+function removeStaleTempFiles() {
+  try {
+    const dir = path.dirname(dataFile);
+    const base = path.basename(dataFile);
+    for (const entry of fs.readdirSync(dir)) {
+      if (entry.startsWith(`${base}.`) && entry.endsWith('.tmp')) {
+        try { fs.unlinkSync(path.join(dir, entry)); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* best effort */ }
+}
+removeStaleTempFiles();
+
 function ensureDataStore() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(path.dirname(dataFile))) {
+    fs.mkdirSync(path.dirname(dataFile), { recursive: true });
   }
 
   if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, JSON.stringify(defaultData, null, 2), 'utf8');
+    writeFileAtomic(dataFile, JSON.stringify(defaultData, null, 2));
     return;
   }
 
@@ -264,13 +325,14 @@ function ensureDataStore() {
         breakGlass: parsed.breakGlass || defaultData.breakGlass,
         queue: parsed.queue || defaultData.queue,
         prescriptions: parsed.prescriptions || defaultData.prescriptions,
-        consentRequests: parsed.consentRequests || defaultData.consentRequests
+        consentRequests: parsed.consentRequests || defaultData.consentRequests,
+        doctorApplications: parsed.doctorApplications || defaultData.doctorApplications
       };
 
-      fs.writeFileSync(dataFile, JSON.stringify(next, null, 2), 'utf8');
+      writeFileAtomic(dataFile, JSON.stringify(next, null, 2));
     }
   } catch (error) {
-    fs.writeFileSync(dataFile, JSON.stringify(defaultData, null, 2), 'utf8');
+    writeFileAtomic(dataFile, JSON.stringify(defaultData, null, 2));
   }
 }
 
@@ -287,7 +349,7 @@ function readData() {
 
 function writeData(data) {
   ensureDataStore();
-  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8');
+  writeFileAtomic(dataFile, JSON.stringify(data, null, 2));
 }
 
 module.exports = {

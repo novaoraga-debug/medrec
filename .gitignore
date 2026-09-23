@@ -1,9 +1,14 @@
 node_modules
 frontend/dist
-backend/data/store.json
+portals/*/dist
+backend/src/data/store.json
+backend/src/data/store.json.*.tmp
 backend/uploads/
 .env
 .env.*
 !/.env.example
+!backend/.env.example
 npm-debug.log*
 .DS_Store
+desktop.ini
+test-out.txt

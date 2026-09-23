@@ -1,6 +1,26 @@
 {
   "users": [
     {
+      "id": "USR-3001",
+      "email": "pharmacist.demo@medrec.local",
+      "firstName": "Pharmacy",
+      "lastName": "Lead",
+      "phone": "",
+      "role": "pharmacist",
+      "passwordHash": "$2a$12$7mNMKL4aG/2UBTBa4QnAhOCAjZLqfrcLM.m3/an/WuUzBkipJpXVy",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": false,
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGhhcm1hY2lzdCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLTMwMDEiLCJpYXQiOjE3OTAxNDYwMTAsImV4cCI6MTc5MjczODAxMH0.Raiq3uU3vd__d2qGQQjgcRd34wQM-Mcb1Y6HEREzPao"
+      ],
+      "createdAt": "2026-09-21T07:37:46.773Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": "",
+      "clinicId": "CLINIC-NAIROBI"
+    },
+    {
       "id": "USR-9001",
       "email": "super.admin@medrec.local",
       "firstName": "System",
@@ -49,7 +69,12 @@
       "provider": "email",
       "verifiedEmail": true,
       "mfaEnabled": true,
-      "refreshTokens": [],
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiZG9jdG9yIiwidHlwZSI6InJlZnJlc2giLCJzdWIiOiJVU1ItMjAwMSIsImlhdCI6MTc5MDE0NTg0OSwiZXhwIjoxNzkyNzM3ODQ5fQ.DwSVDb7P2Mq4IXZR1YQaYbLmz1PCtkG8zjtSvR3HMXg",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiZG9jdG9yIiwidHlwZSI6InJlZnJlc2giLCJzdWIiOiJVU1ItMjAwMSIsImlhdCI6MTc5MDE0NjAxMSwiZXhwIjoxNzkyNzM4MDExfQ.9hzLIozHoUWWlAnPH4ggt4OhJi3R1fwZuannlsyl0II",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiZG9jdG9yIiwidHlwZSI6InJlZnJlc2giLCJzdWIiOiJVU1ItMjAwMSIsImlhdCI6MTc5MDE0NjE2MSwiZXhwIjoxNzkyNzM4MTYxfQ.C_Wf-h78V856iD7AeflRlTXWNkGbj-VLfAe_h4sIyho",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiZG9jdG9yIiwidHlwZSI6InJlZnJlc2giLCJzdWIiOiJVU1ItMjAwMSIsImlhdCI6MTc5MDE0NjkzMCwiZXhwIjoxNzkyNzM4OTMwfQ._6Fsxc9iW27nWijbi-LVhXrHUaFODh_YgltbCycGXxU"
+      ],
       "createdAt": "2026-09-21T07:37:46.773Z",
       "status": "active",
       "specialty": "General Medicine",
@@ -88,7 +113,10 @@
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDAzNzU3LCJleHAiOjE3OTI1OTU3NTd9._4ZHvF9AihwwU0gNmggTNY8qhvWiE98_NuTjZVopSB8",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDA5MTgyLCJleHAiOjE3OTI2MDExODJ9.tTBWXmOySIYuGGRxR_19GkGr3p4XRtd6guaXp35rWJ4",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDEwMTg4LCJleHAiOjE3OTI2MDIxODh9.2bWd82zzt6t6flTm9zjQldhHD2gvjswVw7c1Vo-0JHg",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDEwNjk2LCJleHAiOjE3OTI2MDI2OTZ9.iWXH7fRTo6gZHzoUj57YR9SJA-PwArY8yVw-YP3s8h8"
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMDEwNjk2LCJleHAiOjE3OTI2MDI2OTZ9.iWXH7fRTo6gZHzoUj57YR9SJA-PwArY8yVw-YP3s8h8",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMTQ1ODUwLCJleHAiOjE3OTI3Mzc4NTB9.bcf09XdLNaCusW46ZL7LUn8w5hI-csPJf97Gbk20lb8",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMTQ2MDA5LCJleHAiOjE3OTI3MzgwMDl9.nsFykSbdHYX1wmbzXoo2v-EI8kmPTmEn9Rm37ahXvX4",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLWI4ODcxYTg4IiwiaWF0IjoxNzkwMTQ2OTMxLCJleHAiOjE3OTI3Mzg5MzF9.t95N7HOzXWlYUIDhDOcVz3Lie8nQOrrPdCOA0mEgSao"
       ],
       "createdAt": "2026-09-21T07:37:46.773Z",
       "status": "active",
@@ -110,6 +138,25 @@
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLTdlM2FjNTljIiwiaWF0IjoxNzg5OTg4NjA4LCJleHAiOjE3OTI1ODA2MDh9.XhOLBPxlvpa8b3j76oUn8d_YZf8AsZI5s3UqLeEdcJY"
       ],
       "createdAt": "2026-09-21T11:03:28.145Z",
+      "status": "active",
+      "specialty": "",
+      "licenseNumber": ""
+    },
+    {
+      "id": "USR-10389d70",
+      "email": "audit.reg.123211@example.com",
+      "firstName": "Audit",
+      "lastName": "Reg",
+      "phone": "",
+      "role": "patient",
+      "passwordHash": "$2a$12$pvvR81QRNoP3reasGmqRmuGI8a.VyWXIun/wHlOyYcu6XwTz75mIq",
+      "provider": "email",
+      "verifiedEmail": true,
+      "mfaEnabled": false,
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicGF0aWVudCIsInR5cGUiOiJyZWZyZXNoIiwic3ViIjoiVVNSLTEwMzg5ZDcwIiwiaWF0IjoxNzkwMTQ2OTMyLCJleHAiOjE3OTI3Mzg5MzJ9.DSPUtvqebu3VGHUFeuq27HbLRel3cOwFiLqbXs5PngE"
+      ],
+      "createdAt": "2026-09-23T07:02:12.121Z",
       "status": "active",
       "specialty": "",
       "licenseNumber": ""
@@ -201,6 +248,7 @@
       "qrToken": "medrec-verified-DR-2001-2026"
     }
   ],
+  "doctorApplications": [],
   "prescriptions": [
     {
       "id": "RX-1001",
@@ -230,6 +278,17 @@
       "status": "approved",
       "createdAt": "2026-09-21T08:40:00.000Z",
       "expiresAt": "2026-09-28T08:40:00.000Z"
+    },
+    {
+      "id": "CONS-13fd0143",
+      "patientId": "PT-1001",
+      "actorId": "USR-b8871a88",
+      "actorRole": "patient",
+      "provider": "Audit Check",
+      "purpose": "Runtime smoke test",
+      "status": "pending",
+      "createdAt": "2026-09-23T06:46:49.986Z",
+      "expiresAt": "2026-09-30T06:46:49.986Z"
     }
   ],
   "consentRequests": [],
@@ -306,6 +365,123 @@
     }
   ],
   "audit": [
+    {
+      "id": "AUD-ef8b828e",
+      "actor": "USR-10389d70",
+      "action": "register-account",
+      "resource": "users",
+      "reason": "first-time-account-creation",
+      "status": "success",
+      "timestamp": "2026-09-23T07:02:12.130Z"
+    },
+    {
+      "id": "AUD-bede9202",
+      "actor": "USR-b8871a88",
+      "action": "read-patient-record",
+      "resource": "patients/PT-1001",
+      "reason": "routine-access",
+      "status": "success",
+      "timestamp": "2026-09-23T07:02:11.593Z"
+    },
+    {
+      "id": "AUD-fe18697b",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T07:02:11.513Z"
+    },
+    {
+      "id": "AUD-851c6117",
+      "actor": "USR-2001",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T07:02:10.983Z"
+    },
+    {
+      "id": "AUD-a5c83c07",
+      "actor": "USR-2001",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:49:21.196Z"
+    },
+    {
+      "id": "AUD-90dcbf78",
+      "actor": "USR-2001",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:51.173Z"
+    },
+    {
+      "id": "AUD-e606058a",
+      "actor": "USR-3001",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:50.646Z"
+    },
+    {
+      "id": "AUD-c6fb3adc",
+      "actor": "USR-b8871a88",
+      "action": "view-file",
+      "resource": "uploads/1790073837059-rx.png",
+      "reason": "record-access",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:50.046Z"
+    },
+    {
+      "id": "AUD-e9626d55",
+      "actor": "USR-b8871a88",
+      "action": "issue-file-token",
+      "resource": "uploads/1790073837059-rx.png",
+      "reason": "record-access",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:50.033Z"
+    },
+    {
+      "id": "AUD-b2b7c9c2",
+      "actor": "USR-b8871a88",
+      "action": "consent-requested",
+      "resource": "consent/CONS-13fd0143",
+      "reason": "routine-access",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:49.991Z"
+    },
+    {
+      "id": "AUD-41dba696",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:46:49.885Z"
+    },
+    {
+      "id": "AUD-bfb0af58",
+      "actor": "USR-b8871a88",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:44:10.122Z"
+    },
+    {
+      "id": "AUD-27eb493f",
+      "actor": "USR-2001",
+      "action": "login",
+      "resource": "auth",
+      "reason": "user-login",
+      "status": "success",
+      "timestamp": "2026-09-23T06:44:09.880Z"
+    },
     {
       "id": "AUD-3f3d8e1e",
       "actor": "USR-b8871a88",
@@ -563,7 +739,20 @@
       }
     ]
   },
-  "syncQueue": [],
+  "syncQueue": [
+    {
+      "id": "Q-68b53b59",
+      "type": "audit-sync",
+      "recordType": "patient-record",
+      "recordId": "PT-1001",
+      "payload": {
+        "status": "queued"
+      },
+      "createdAt": "2026-09-23T06:46:50.000Z",
+      "status": "queued",
+      "conflictState": "last-write-wins"
+    }
+  ],
   "breakGlass": [],
   "queue": []
 }

@@ -2,8 +2,16 @@
   "name": "medrec",
   "private": true,
   "scripts": {
-    "install:all": "npm install --prefix backend",
+    "install:all": "npm install --prefix backend && npm install --prefix portals/patient && npm install --prefix portals/doctor && npm install --prefix portals/pharmacist && npm install --prefix portals/staff",
     "dev": "npm run dev --prefix backend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:patient": "npm run dev --prefix portals/patient",
+    "dev:doctor": "npm run dev --prefix portals/doctor",
+    "dev:pharmacist": "npm run dev --prefix portals/pharmacist",
+    "dev:staff": "npm run dev --prefix portals/staff",
+    "dev:portals": "concurrently -n patient,doctor,pharmacist,staff -c blue,green,yellow,magenta \"npm:dev:patient\" \"npm:dev:doctor\" \"npm:dev:pharmacist\" \"npm:dev:staff\"",
+    "dev:all": "concurrently -n backend,patient,doctor,pharmacist,staff -c red,blue,green,yellow,magenta \"npm:dev:backend\" \"npm:dev:patient\" \"npm:dev:doctor\" \"npm:dev:pharmacist\" \"npm:dev:staff\"",
+    "build:portals": "npm run build --prefix portals/patient && npm run build --prefix portals/doctor && npm run build --prefix portals/pharmacist && npm run build --prefix portals/staff",
     "start": "npm run start --prefix backend"
   },
   "devDependencies": {

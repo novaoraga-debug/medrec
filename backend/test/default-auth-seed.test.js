@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+// Isolated per-process store; must be required before the store module.
+require('./helpers/isolated-store');
 const { readData } = require('../src/store');
 
 test('default user store includes a demo patient login for the app UI', () => {

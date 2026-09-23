@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// Isolated per-process store; must be required before the server module.
+require('./helpers/isolated-store');
 const { buildFhirBundle, queueOfflineSyncEntry } = require('../src/server');
 
 test('FHIR export includes patient, medication, and consent resources', () => {
