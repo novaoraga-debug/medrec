@@ -33,6 +33,7 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
   --space-10: 2.5rem;
+  --layout-header-height: 7.5rem;
 }
 
 :root[data-theme='light'] {
@@ -150,6 +151,8 @@ img {
 }
 
 .app-shell {
+  position: relative;
+  min-height: 100dvh;
   max-width: 1560px;
   margin: 0 auto;
   padding: 1.5rem 1.5rem 4rem;
@@ -203,12 +206,15 @@ img {
 }
 
 .topbar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   margin-bottom: 0.75rem;
-  padding: 1.35rem 1.5rem;
+  padding: 1rem 1.5rem;
   border: 1px solid var(--border);
   border-radius: 28px;
   background: linear-gradient(135deg, rgba(12, 33, 55, 0.98), rgba(9, 24, 42, 0.92));
@@ -230,6 +236,7 @@ img {
   box-shadow: 0 10px 28px rgba(42, 164, 141, 0.25);
 }
 .topbar-subtitle { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.topbar h1 { font-size: clamp(1.3rem, 1.8vw, 1.7rem); }
 .workspace-nav {
   display: flex;
   align-items: center;
@@ -252,6 +259,10 @@ img {
   font-size: 0.9rem;
 }
 .workspace-nav-item:hover, .workspace-nav-item.active { background: rgba(110, 231, 200, 0.14); color: var(--primary); transform: none; }
+
+.bottom-bar {
+  display: none;
+}
 
 /* Role-specific visual identities: the patient experience is calm and personal;
    the doctor experience is compact and operational. */
@@ -555,18 +566,21 @@ h2 {
 
 .auth-shell {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  min-height: 80vh;
-  padding: 2rem 1rem;
+  min-height: calc(100dvh - 5.5rem);
+  padding: 2.5rem 1rem;
 }
 
 .auth-layout {
-  width: min(1280px, 100%);
+  width: min(1024px, 100%);
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 1.25rem;
+  grid-template-columns: 1fr 0.9fr;
+  gap: 1.5rem;
   align-items: stretch;
+  /* Auto block margins center the card when there is spare space, but resolve
+     to zero on overflow so a short viewport can never clip the sign-in card. */
+  margin-block: auto;
 }
 
 .brand-panel {
@@ -630,22 +644,6 @@ h2 {
   animation: signal-scan 2.4s ease-in-out infinite;
 }
 
-.login-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.status-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 5px rgba(125, 224, 167, 0.12);
-  animation: status-breathe 2.2s ease-in-out infinite;
-}
 .auth-layout { animation: login-arrive 620ms cubic-bezier(.22,.8,.32,1) both; }
 .login-panel { animation: login-panel-arrive 740ms cubic-bezier(.22,.8,.32,1) 120ms both; }
 .reveal-step { animation: reveal-step 500ms ease both; }
@@ -657,11 +655,10 @@ h2 {
 @keyframes reveal-step { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes signal-pulse { 0%, 100% { transform: scale(0.85); opacity: 0.65; } 50% { transform: scale(1.2); opacity: 1; } }
 @keyframes signal-scan { 0%, 100% { transform: scaleX(0.35); opacity: 0.35; } 50% { transform: scaleX(1); opacity: 1; } }
-@keyframes status-breathe { 0%, 100% { box-shadow: 0 0 0 4px rgba(125,224,167,0.12); } 50% { box-shadow: 0 0 0 8px rgba(125,224,167,0.03); } }
 @keyframes medical-orbit { from { transform: rotate(0deg) translateX(8px) rotate(0deg); } to { transform: rotate(360deg) translateX(8px) rotate(-360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-layout, .login-panel, .reveal-step, .brand-panel::after, .signal-dot, .signal-line, .status-pulse { animation: none; }
+  .auth-layout, .login-panel, .reveal-step, .brand-panel::after, .signal-dot, .signal-line { animation: none; }
 }
 
 .brand-badge {
@@ -725,11 +722,14 @@ h2 {
 }
 
 .login-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   width: min(760px, 100%);
   background: rgba(11, 25, 41, 0.9);
   border: 1px solid var(--border);
   border-radius: 26px;
-  padding: 1.5rem;
+  padding: 2rem;
   box-shadow: 0 22px 50px rgba(6, 18, 31, 0.38);
 }
 
@@ -750,8 +750,6 @@ h2 {
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
   border-radius: 14px;
-  min-height: 54px;
-  font-weight: 700;
 }
 
 .role-card.active {
@@ -1109,6 +1107,10 @@ h2 {
     align-items: flex-start;
   }
 
+  .topbar {
+    position: static;
+  }
+
   .stats-grid,
   .field-group.compact,
   .analytics-grid,
@@ -1128,5 +1130,733 @@ h2 {
 
   .care-flow-step {
     min-width: 150px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Sign-in screen: tabs, role cards, status cards, staff unlock
+   --------------------------------------------------------------------------- */
+.auth-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.9rem 0 0.5rem;
+}
+
+.auth-tab {
+  flex: 1;
+  min-height: 48px;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.auth-tab.active {
+  background: linear-gradient(135deg, rgba(110, 231, 200, 0.18), rgba(42, 164, 141, 0.16));
+  border-color: rgba(110, 231, 200, 0.55);
+  color: var(--text);
+}
+
+.auth-pane {
+  animation: reveal-step 320ms ease both;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.9rem 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.micro-hint {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  min-height: 48px;
+  padding: 0.5rem;
+  color: var(--primary);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.staff-unlock {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.unlock-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.unlock-row input {
+  max-width: 220px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+}
+
+.role-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+  min-height: 92px;
+  animation: role-card-in 460ms cubic-bezier(0.22, 0.8, 0.32, 1) both;
+}
+
+.role-card:nth-child(2) { animation-delay: 70ms; }
+.role-card:nth-child(3) { animation-delay: 140ms; }
+.role-card:nth-child(4) { animation-delay: 210ms; }
+
+.role-card-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.role-card-name {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.role-card-hint {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+@keyframes role-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Google sign-in slot */
+.google-signin {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+}
+
+.google-signin-slot.is-ready {
+  min-height: 48px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------------------
+   Inline notices + status/error banners (no window.alert anywhere)
+   --------------------------------------------------------------------------- */
+.notice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.75rem 1rem 0;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  animation: reveal-step 260ms ease both;
+}
+
+.notice-banner.success {
+  border-color: rgba(125, 224, 167, 0.5);
+  background: rgba(125, 224, 167, 0.1);
+}
+
+.notice-banner.error {
+  border-color: rgba(255, 120, 134, 0.5);
+  background: rgba(255, 120, 134, 0.1);
+}
+
+.notice-banner.info {
+  border-color: rgba(110, 231, 200, 0.45);
+  background: rgba(110, 231, 200, 0.09);
+}
+
+.notice-dismiss {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+}
+
+.error-banner {
+  border: 1px solid rgba(255, 120, 134, 0.45);
+  background: rgba(255, 120, 134, 0.08);
+  color: var(--danger);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+}
+
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.85rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.grid-layout > .status-banner {
+  grid-column: 1 / -1;
+}
+
+.status-banner p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.status-banner.pending {
+  border-color: rgba(255, 184, 102, 0.45);
+  background: rgba(255, 184, 102, 0.08);
+}
+
+.status-banner.approved {
+  border-color: rgba(125, 224, 167, 0.45);
+  background: rgba(125, 224, 167, 0.08);
+}
+
+.status-banner.rejected {
+  border-color: rgba(255, 120, 134, 0.45);
+  background: rgba(255, 120, 134, 0.08);
+}
+
+.tag-pending,
+.tag-under_review { color: var(--warning); }
+.tag-approved { color: var(--success); }
+.tag-rejected { color: var(--danger); }
+
+/* ---------------------------------------------------------------------------
+   Topbar extras: queue chip, role switcher, notifications popover
+   --------------------------------------------------------------------------- */
+.queue-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.queue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 224, 167, 0.5);
+  color: var(--success);
+  background: rgba(125, 224, 167, 0.08);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.queue-chip.pending {
+  border-color: rgba(255, 184, 102, 0.5);
+  color: var(--warning);
+  background: rgba(255, 184, 102, 0.08);
+}
+
+.role-switcher {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.role-switch {
+  min-height: 40px;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.role-switch.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  color: #f7fffd;
+}
+
+.bell.active {
+  border-color: var(--primary);
+}
+
+.topbar-actions {
+  position: relative;
+}
+
+.notifications-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 1rem;
+  width: min(360px, calc(100vw - 2rem));
+  max-height: 380px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px var(--shadow);
+  padding: 0.75rem;
+  z-index: 40;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.notifications-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notification-item {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.85rem;
+}
+
+.notification-item small {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Trust card + badges (QR scan verification)
+   --------------------------------------------------------------------------- */
+.trust-card {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  text-align: center;
+  margin-top: 0.9rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+
+.trust-card.verified {
+  border-color: rgba(125, 224, 167, 0.55);
+  background: rgba(125, 224, 167, 0.08);
+}
+
+.trust-card.warning {
+  border-color: rgba(255, 184, 102, 0.55);
+  background: rgba(255, 184, 102, 0.08);
+}
+
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.trust-badge.ok {
+  color: var(--success);
+  border: 1px solid rgba(125, 224, 167, 0.55);
+  background: rgba(125, 224, 167, 0.1);
+}
+
+.trust-badge.pending {
+  color: var(--warning);
+  border: 1px solid rgba(255, 184, 102, 0.55);
+  background: rgba(255, 184, 102, 0.1);
+}
+
+.trust-badge.bad {
+  color: var(--danger);
+  border: 1px solid rgba(255, 120, 134, 0.55);
+  background: rgba(255, 120, 134, 0.1);
+}
+
+/* Download link styled like a button */
+a.qr-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+a.qr-download.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Selectable queue rows (pharmacist pending list) */
+button.detail-card.selectable {
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  color: var(--text);
+}
+
+button.detail-card.selectable.active {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/* Application review card (staff console) */
+.review-card {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.review-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.document-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.document-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Skip link + tap-target floor (48×48)
+   --------------------------------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--primary);
+  color: #062822;
+  padding: 0.75rem 1rem;
+  border-radius: 0 0 12px 0;
+  font-weight: 800;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+#main-content {
+  scroll-margin-top: calc(var(--layout-header-height) + 1rem);
+}
+
+button.small {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+input,
+select,
+textarea {
+  min-height: 48px;
+}
+
+/* ---------------------------------------------------------------------------
+   Entrance polish: panel stagger + floating brand badge
+   --------------------------------------------------------------------------- */
+main.grid-layout > .panel {
+  animation: panel-arrive 420ms cubic-bezier(0.22, 0.8, 0.32, 1) both;
+}
+
+main.grid-layout > .panel:nth-child(2) { animation-delay: 60ms; }
+main.grid-layout > .panel:nth-child(3) { animation-delay: 120ms; }
+main.grid-layout > .panel:nth-child(4) { animation-delay: 180ms; }
+main.grid-layout > .panel:nth-child(5) { animation-delay: 240ms; }
+
+@keyframes panel-arrive {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.brand-badge {
+  animation: hero-float 5s ease-in-out infinite;
+}
+
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-card,
+  main.grid-layout > .panel,
+  .brand-badge,
+  .auth-pane,
+  .notice-banner {
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print: clean output for PDF export of any screen
+   --------------------------------------------------------------------------- */
+@media print {
+  * {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  body,
+  html {
+    background: #fff !important;
+  }
+
+  .skip-link,
+  .topbar-actions,
+  .workspace-nav,
+  .care-flow,
+  .auth-tabs,
+  .staff-unlock,
+  .button-row,
+  .inline-actions,
+  .auth-actions,
+  .notice-dismiss,
+  video,
+  canvas,
+  button,
+  a.qr-download {
+    display: none !important;
+  }
+
+  .panel {
+    border: 1px solid #999 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 0.75rem;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
+
+/* Login panel children rely on the flex gap above for vertical rhythm, so the
+   individual margin rules are neutralised for direct children only. */
+.login-panel > * {
+  margin-block: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive: tablet ≤768px, phone ≤480px
+   --------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 0.75rem;
+  }
+
+  .auth-shell {
+    padding: 1rem 0.75rem;
+    min-height: auto;
+  }
+
+  .auth-layout {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .brand-panel {
+    padding: 1.4rem;
+  }
+
+  .grid-layout {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .panel,
+  .hero-panel,
+  .panel.span-2 {
+    grid-column: auto / -1;
+    padding: 1rem 0.9rem;
+  }
+
+  .role-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .topbar {
+    padding: 0.9rem;
+  }
+
+  .topbar h1 {
+    font-size: 1.25rem;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .prescribe-grid,
+  .appointment-form-grid,
+  .prep-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .search-row {
+    flex-direction: column;
+  }
+
+  .auth-tabs {
+    flex-wrap: wrap;
+  }
+
+  .auth-tab {
+    flex: 1 1 30%;
+  }
+
+  .notifications-popover {
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid,
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row,
+  .auth-actions {
+    flex-direction: column;
+  }
+
+  .button-row > *,
+  .auth-actions > * {
+    width: 100%;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+  }
+
+  .bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.55rem 0.65rem calc(0.55rem + env(safe-area-inset-bottom));
+    background: var(--role-surface, var(--surface));
+    border-top: 1px solid var(--role-border, var(--border));
+    backdrop-filter: blur(14px);
+    box-shadow: 0 -14px 32px var(--shadow);
+  }
+
+  .bottom-bar-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 52px;
+    padding: 0.35rem 0.25rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: var(--role-muted, var(--muted));
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  .bottom-bar-item.active {
+    background: rgba(110, 231, 200, 0.14);
+    border-color: rgba(110, 231, 200, 0.35);
+    color: var(--role-primary, var(--primary));
+  }
+
+  .workspace-nav {
+    display: none;
+  }
+
+  .app-shell {
+    padding-bottom: 5.75rem;
   }
 }
