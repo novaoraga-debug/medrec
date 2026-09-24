@@ -1696,12 +1696,13 @@ function HealthcareApp() {
         <motion.div key={`${currentRoute}-${selectedRole}`} {...pageTransition}>
           <nav className="workspace-nav" aria-label="Workspace sections">
             <span className="workspace-nav-label">Workspace</span>
-            <button className="workspace-nav-item active">Overview</button>
+            <button className="workspace-nav-item active" aria-current="page">Overview</button>
             <button className="workspace-nav-item" onClick={() => handleDemoAction('Records', 'Your consent-aware records are shown below.')}>Records</button>
             <button className="workspace-nav-item" onClick={() => handleDemoAction('Messages', 'Your care team messages are up to date.')}>Messages</button>
             <button className="workspace-nav-item" onClick={() => handleDemoAction('Support', 'MedRec support is available to help.')}>Support</button>
           </nav>
 
+          <main id="main-content" tabIndex={-1} className="workspace-main">
           <div className="trust-banner">
             AI-assisted transcription is for clinician review only. It is not a diagnosis or a final prescription.
           </div>
@@ -1796,6 +1797,7 @@ function HealthcareApp() {
               onGuestPatientCreate={handleGuestPatientCreate}
             />
           )}
+          </main>
         </motion.div>
       </AnimatePresence>
     );
