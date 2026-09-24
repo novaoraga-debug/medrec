@@ -787,10 +787,27 @@ app.get('/api/health', (_, res) => {
   res.json({ status: 'ok', timestamp: nowIso() });
 });
 
+// Role policy for every self-service door (this route and /api/auth/google).
+// Only patients may create their own account: verified doctor and pharmacist
+// accounts are created exclusively by staff approval of a verification
+// application, and admin accounts are provisioned out of band.
+const SELF_SERVICE_ROLES = ['patient'];
+const PRIVILEGED_ROLES = ['doctor', 'pharmacist', 'admin', 'super_admin', 'clinic_admin'];
+
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { email, password, role = 'patient', firstName, lastName, phone, specialty, licenseNumber } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  const requestedRole = String(role).toLowerCase();
+  if (!SELF_SERVICE_ROLES.includes(requestedRole)) {
+    if (requestedRole === 'doctor' || requestedRole === 'pharmacist') {
+      return res.status(403).json({
+        error: 'Doctor and pharmacist accounts are created only after staff approve a verification application. Submit the Apply once form instead.'
+      });
+    }
+    return res.status(403).json({ error: 'This role cannot be self-registered.' });
   }
 
   const data = readData();
@@ -806,11 +823,11 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     firstName: firstName || 'New',
     lastName: lastName || 'User',
     phone: phone || '',
-    role,
+    role: requestedRole,
     passwordHash: hashPassword(password),
     provider: 'email',
     verifiedEmail: true,
-    mfaEnabled: role === 'doctor' || role === 'admin',
+    mfaEnabled: false,
     refreshTokens: [],
     createdAt: nowIso(),
     status: 'active',
@@ -819,19 +836,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   };
 
   data.users.push(user);
-  if (role === 'doctor') {
-    data.doctors.push({
-      id: makeId('DR'),
-      userId: user.id,
-      name: `${user.firstName} ${user.lastName}`,
-      specialty: specialty || 'General Medicine',
-      licenseNumber: licenseNumber || 'PENDING',
-      affiliation: 'Pending verification',
-      verificationStatus: 'pending',
-      verified: false,
-      createdAt: nowIso()
-    });
-  }
   writeData(data);
 
   const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
@@ -864,10 +868,10 @@ app.post('/api/auth/login', authLimiter, (req, res) => {
   res.json({ user: sanitizeUser(user), accessToken, refreshToken, expiresInSeconds: 15 * 60 });
 });
 
-// Only these roles may self-serve with Google. Privileged roles must use their
-// dedicated flows: doctors go through application review, admins use MFA login.
-const GOOGLE_SELF_SERVICE_ROLES = ['patient', 'pharmacist'];
-const PRIVILEGED_ROLES = ['doctor', 'admin', 'super_admin', 'clinic_admin'];
+// Google obeys the same self-service policy as /api/auth/register: patients only.
+// Doctor and pharmacist Google identities are routed through the verification
+// application instead, and admins keep email + MFA.
+const GOOGLE_SELF_SERVICE_ROLES = SELF_SERVICE_ROLES;
 
 app.get('/api/auth/providers', (_, res) => {
   res.json({
@@ -889,6 +893,11 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
   if (PRIVILEGED_ROLES.includes(requestedRole)) {
     if (requestedRole === 'doctor') {
       return res.status(403).json({ error: 'Doctor accounts require verification. Please apply through the doctor portal.' });
+    }
+    if (requestedRole === 'pharmacist') {
+      return res.status(403).json({
+        error: 'Pharmacist accounts require verification. Submit the application and wait for staff approval before signing in.'
+      });
     }
     return res.status(403).json({ error: 'This role cannot be used with Google sign-in.' });
   }
@@ -932,7 +941,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
       const existingRole = String(user.role || '').toLowerCase();
       // A Google login must never escalate or change an existing account's role.
       if (PRIVILEGED_ROLES.includes(existingRole)) {
-        return res.status(403).json({ error: 'This role cannot sign in with Google. Use the correct portal.' });
+        return res.status(403).json({ error: 'This role cannot sign in with Google. Use email and password sign-in.' });
       }
       if (existingRole !== requestedRole) {
         return res.status(403).json({ error: 'This account is registered with a different role. Use the correct portal.' });
@@ -1122,6 +1131,12 @@ app.post('/api/doctors/apply', applicationUpload.array('documents', 5), (req, re
   const firstName = String(req.body.firstName || '').trim();
   const lastName = String(req.body.lastName || '').trim();
   const licenseNumber = String(req.body.licenseNumber || '').trim();
+  // One verification form serves both gated roles. Staff approval activates
+  // the matching account type (doctor gets a record + QR; pharmacist does not).
+  const role = String(req.body.role || 'doctor').toLowerCase();
+  if (!['doctor', 'pharmacist'].includes(role)) {
+    return res.status(400).json({ error: "Role must be 'doctor' or 'pharmacist'." });
+  }
 
   if (!email || !password || !firstName || !lastName || !licenseNumber) {
     return res.status(400).json({ error: 'Name, email, password, and license number are required.' });
@@ -1130,6 +1145,7 @@ app.post('/api/doctors/apply', applicationUpload.array('documents', 5), (req, re
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   }
+  const specialty = String(req.body.specialty || '').trim() || (role === 'pharmacist' ? 'Pharmacy' : 'General Medicine');
 
   const data = readData();
   if (data.users.some((user) => user.email.toLowerCase() === email)) {
@@ -1146,12 +1162,13 @@ app.post('/api/doctors/apply', applicationUpload.array('documents', 5), (req, re
   const documents = collectUploadedDocuments(req.files || []);
   const application = {
     id: makeId('APP'),
+    role,
     firstName,
     lastName,
     name: doctorNameFrom(firstName, lastName),
     email,
     passwordHash: hashPassword(password),
-    specialty: String(req.body.specialty || 'General Medicine').trim() || 'General Medicine',
+    specialty,
     licenseNumber,
     affiliation: String(req.body.affiliation || 'Pending verification').trim() || 'Pending verification',
     clinicId: req.body.clinicId || 'CLINIC-NAIROBI',
@@ -1174,6 +1191,7 @@ app.post('/api/doctors/apply', applicationUpload.array('documents', 5), (req, re
   res.status(201).json({
     application: {
       id: application.id,
+      role: application.role,
       name: application.name,
       email: application.email,
       specialty: application.specialty,
@@ -1205,6 +1223,7 @@ app.get('/api/doctors/apply/status', (req, res) => {
 
   res.json({
     id: application.id,
+    role: application.role || 'doctor',
     name: application.name,
     status: application.status,
     submittedAt: application.submittedAt,
@@ -1308,6 +1327,7 @@ app.post('/api/admin/doctor-applications/:id/approve', requireAdminAuth, (req, r
   }
 
   const clinicId = req.body.clinicId || application.clinicId || (req.user.clinicId || 'CLINIC-NAIROBI');
+  const targetRole = application.role === 'pharmacist' ? 'pharmacist' : 'doctor';
 
   const user = {
     id: makeId('USR'),
@@ -1315,11 +1335,11 @@ app.post('/api/admin/doctor-applications/:id/approve', requireAdminAuth, (req, r
     firstName: application.firstName,
     lastName: application.lastName,
     phone: application.phone || '',
-    role: 'doctor',
+    role: targetRole,
     passwordHash: application.passwordHash,
     provider: 'email',
     verifiedEmail: true,
-    mfaEnabled: true,
+    mfaEnabled: targetRole === 'doctor',
     refreshTokens: [],
     createdAt: nowIso(),
     status: 'active',
@@ -1329,45 +1349,52 @@ app.post('/api/admin/doctor-applications/:id/approve', requireAdminAuth, (req, r
   };
   data.users.push(user);
 
-  const doctor = {
-    id: makeId('DR'),
-    userId: user.id,
-    name: application.name,
-    specialty: application.specialty,
-    licenseNumber: application.licenseNumber,
-    email: application.email,
-    affiliation: req.body.affiliation || application.affiliation,
-    clinicId,
-    verified: true,
-    verificationStatus: 'approved',
-    roles: ['Doctor'],
-    documents: application.documents || [],
-    appliedAt: application.submittedAt,
-    approvedAt: nowIso(),
-    reviewedBy: req.user.sub,
-    createdAt: nowIso()
-  };
-  doctor.qrToken = issueToken(doctor.id, { type: 'doctor-qr', doctorId: doctor.id, verified: true }, QR_SECRET, '5m');
-  data.doctors.push(doctor);
+  // Only doctors get a clinician record and a verification QR; a pharmacist
+  // approval simply activates the login account.
+  let doctor = null;
+  if (targetRole === 'doctor') {
+    doctor = {
+      id: makeId('DR'),
+      userId: user.id,
+      name: application.name,
+      specialty: application.specialty,
+      licenseNumber: application.licenseNumber,
+      email: application.email,
+      affiliation: req.body.affiliation || application.affiliation,
+      clinicId,
+      verified: true,
+      verificationStatus: 'approved',
+      roles: ['Doctor'],
+      documents: application.documents || [],
+      appliedAt: application.submittedAt,
+      approvedAt: nowIso(),
+      reviewedBy: req.user.sub,
+      createdAt: nowIso()
+    };
+    doctor.qrToken = issueToken(doctor.id, { type: 'doctor-qr', doctorId: doctor.id, verified: true }, QR_SECRET, '5m');
+    data.doctors.push(doctor);
+  }
 
   application.status = 'approved';
   application.reviewedBy = req.user.sub;
   application.reviewedAt = nowIso();
   application.createdUserId = user.id;
-  application.createdDoctorId = doctor.id;
+  application.createdDoctorId = doctor ? doctor.id : null;
 
   data.notifications.unshift({
     id: makeId('NOT'),
     patientId: null,
     channel: 'email',
-    title: 'Doctor verification approved',
-    message: `Your MedRec doctor account has been approved. You can now sign in and generate your verification QR code.`,
+    title: targetRole === 'pharmacist' ? 'Pharmacist verification approved' : 'Doctor verification approved',
+    message: targetRole === 'pharmacist'
+      ? 'Your MedRec pharmacist account has been approved. You can now sign in.'
+      : 'Your MedRec doctor account has been approved. You can now sign in and generate your verification QR code.',
     read: false,
     createdAt: nowIso()
   });
 
   writeData(data);
-  logAccess({ actor: req.user.sub, action: 'approve-doctor-application', resource: `doctorApplications/${application.id}`, reason: 'staff-verification' });
+  logAccess({ actor: req.user.sub, action: `approve-${targetRole}-application`, resource: `doctorApplications/${application.id}`, reason: 'staff-verification' });
 
   res.json({ application, doctor, user: sanitizeUser(user) });
 });

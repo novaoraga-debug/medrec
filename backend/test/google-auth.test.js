@@ -114,28 +114,58 @@ test('google sign-up creates a patient and repeat sign-in logs them in', async (
   }
 });
 
-test('google sign-in cannot cross into another role or escalate', async () => {
+test('google sign-in cannot mint a pharmacist or escalate an existing account', async () => {
   const email = `google.cross.${Date.now()}@example.com`;
   try {
     mockGooglePayload({ email, email_verified: true, given_name: 'Cross', family_name: 'Role' });
 
     await withServer(async (base) => {
-      // Existing pharmacist tries to Google-sign-in as a patient.
-      const signup = await fetch(`${base}/api/auth/google`, {
+      // Pharmacist logins are staff-approved only, so Google self-service is closed.
+      const pharmacist = await fetch(`${base}/api/auth/google`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ idToken: 'mock-token', role: 'pharmacist' })
       });
-      assert.equal(signup.status, 201);
+      assert.equal(pharmacist.status, 403);
+      const pharmacistBody = await pharmacist.json();
+      assert.match(pharmacistBody.error, /verification|approval/i);
 
-      const cross = await fetch(`${base}/api/auth/google`, {
+      // A patient can still self-serve...
+      const signup = await fetch(`${base}/api/auth/google`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ idToken: 'mock-token', role: 'patient' })
       });
-      assert.equal(cross.status, 403);
-      const crossBody = await cross.json();
-      assert.match(crossBody.error, /different role/i);
+      assert.equal(signup.status, 201);
+
+      // ...but cannot use Google to reach a privileged role.
+      const escalate = await fetch(`${base}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ idToken: 'mock-token', role: 'super_admin' })
+      });
+      assert.equal(escalate.status, 403);
+
+      // Repeating the same role is a plain sign-in and never changes the role.
+      const repeat = await fetch(`${base}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ idToken: 'mock-token', role: 'patient' })
+      });
+      assert.equal(repeat.status, 200);
+      const repeatBody = await repeat.json();
+      assert.equal(repeatBody.isNewUser, false);
+      assert.equal(repeatBody.user.role, 'patient');
+
+      // A pre-existing pharmacist (seeded demo account) cannot Google in at all.
+      mockGooglePayload({ email: 'pharmacist.demo@medrec.local', email_verified: true });
+      const seeded = await fetch(`${base}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ idToken: 'mock-token', role: 'patient' })
+      });
+      assert.equal(seeded.status, 403);
+      assert.match((await seeded.json()).error, /email and password/i);
 
       // The stored role must be unchanged.
       const login = await fetch(`${base}/api/auth/login`, {
