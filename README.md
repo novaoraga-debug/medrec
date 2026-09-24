@@ -163,6 +163,8 @@ no longer drop mid-use.
 Refresh tokens are single-use: `POST /api/auth/refresh` rotates the token, retires the value
 that was presented, and returns the replacement, which the clients persist. Expired entries are
 pruned and each account keeps at most `MEDREC_MAX_REFRESH_TOKENS` live tokens (default 10).
+Replaying a token that was already rotated is treated as theft: every session for that account is
+revoked, not just the request refused.
 Signing out calls `POST /api/auth/logout`, which revokes only that session, while
 **Sign out everywhere** still calls `POST /api/auth/logout-all`.
 

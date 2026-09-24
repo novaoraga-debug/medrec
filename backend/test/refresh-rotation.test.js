@@ -35,8 +35,7 @@ async function registerPatient(base) {
 }
 
 // A refresh token is single-use: refreshing retires the token that was
-// presented and returns its replacement, so an intercepted token cannot be
-// replayed once the legitimate client has refreshed.
+// presented and returns its replacement.
 test('refresh rotates the token and retires the previous one', async () => {
   try {
     await withServer(async (base) => {
@@ -50,12 +49,31 @@ test('refresh rotates the token and retires the previous one', async () => {
       assert.ok(rotated.refreshToken, 'rotation returns a replacement refresh token');
       assert.notEqual(rotated.refreshToken, registered.refreshToken);
 
-      const replay = await postJson(base + '/api/auth/refresh', { refreshToken: registered.refreshToken });
-      assert.equal(replay.status, 401, 'a retired refresh token is rejected');
-
       const second = await postJson(base + '/api/auth/refresh', { refreshToken: rotated.refreshToken });
-      assert.equal(second.status, 200);
+      assert.equal(second.status, 200, 'the replacement keeps working');
       assert.notEqual((await second.json()).refreshToken, rotated.refreshToken);
+    });
+  } finally {
+    restoreStore();
+  }
+});
+
+// Replaying a token that was already rotated means the value leaked, so the
+// whole family must be revoked instead of only refusing the request.
+test('replaying a retired refresh token revokes every session', async () => {
+  try {
+    await withServer(async (base) => {
+      const registered = await registerPatient(base);
+      const first = await postJson(base + '/api/auth/refresh', { refreshToken: registered.refreshToken });
+      assert.equal(first.status, 200);
+      const rotated = await first.json();
+
+      const replay = await postJson(base + '/api/auth/refresh', { refreshToken: registered.refreshToken });
+      assert.equal(replay.status, 401);
+      assert.match((await replay.json()).error, /reuse/i, 'the reply reports reuse');
+
+      const afterReuse = await postJson(base + '/api/auth/refresh', { refreshToken: rotated.refreshToken });
+      assert.equal(afterReuse.status, 401, 'the replacement was revoked with the family');
     });
   } finally {
     restoreStore();

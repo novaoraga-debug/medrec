@@ -257,7 +257,7 @@ function nowIso() {
 
 function sanitizeUser(user) {
   if (!user) return null;
-  const { passwordHash, refreshTokens, ...safeUser } = user;
+  const { passwordHash, refreshTokens, retiredRefreshJtis, ...safeUser } = user;
   return safeUser;
 }
 
@@ -287,6 +287,10 @@ function verifyRefreshToken(token) {
 // value that was presented, and prunes anything expired so a long-lived
 // account cannot accumulate unbounded usable tokens in the store.
 const MAX_REFRESH_TOKENS = Number(process.env.MEDREC_MAX_REFRESH_TOKENS || 10);
+
+// Retired refresh-token ids kept per account so a replay of an already
+// rotated token can be told apart from an unknown one.
+const MAX_RETIRED_REFRESH_JTIS = 20;
 
 function pruneExpiredRefreshTokens(tokens) {
   if (!Array.isArray(tokens)) return;
@@ -1054,7 +1058,22 @@ app.post('/api/auth/refresh', (req, res) => {
     const payload = verifyRefreshToken(refreshToken);
     const data = readData();
     const user = data.users.find((entry) => entry.id === payload.sub);
-    if (!user || !user.refreshTokens?.includes(refreshToken)) {
+    if (!user) {
+      return res.status(401).json({ error: 'Refresh token invalid or revoked.' });
+    }
+
+    if (!user.refreshTokens?.includes(refreshToken)) {
+      // The token verifies but is no longer live. If we retired it ourselves,
+      // this is a replay of a rotated token: assume the value leaked and drop
+      // every session for the account instead of only refusing this request.
+      const retired = Array.isArray(user.retiredRefreshJtis) ? user.retiredRefreshJtis : [];
+      if (payload.jti && retired.includes(payload.jti)) {
+        user.refreshTokens = [];
+        user.retiredRefreshJtis = [];
+        writeData(data);
+        logAccess({ actor: user.id, action: 'refresh-token-reuse-detected', resource: 'auth', reason: 'rotated-token-replayed' });
+        return res.status(401).json({ error: 'Refresh token reuse detected. All sessions signed out.' });
+      }
       return res.status(401).json({ error: 'Refresh token invalid or revoked.' });
     }
 
@@ -1067,6 +1086,15 @@ app.post('/api/auth/refresh', (req, res) => {
     if (consumedAt !== -1) user.refreshTokens.splice(consumedAt, 1);
     user.refreshTokens.push(rotatedRefreshToken);
     pruneExpiredRefreshTokens(user.refreshTokens);
+
+    if (payload.jti) {
+      const retired = Array.isArray(user.retiredRefreshJtis) ? user.retiredRefreshJtis : [];
+      retired.push(payload.jti);
+      user.retiredRefreshJtis = retired.length > MAX_RETIRED_REFRESH_JTIS
+        ? retired.slice(retired.length - MAX_RETIRED_REFRESH_JTIS)
+        : retired;
+    }
+
     writeData(data);
 
     logAccess({ actor: user.id, action: 'token-refresh', resource: 'auth', reason: 'refresh-token-rotated' });
@@ -1160,6 +1188,7 @@ app.post('/api/auth/logout-all', requireAuth, (req, res) => {
   }
 
   user.refreshTokens = [];
+  user.retiredRefreshJtis = [];
   writeData(data);
   logAccess({ actor: user.id, action: 'logout-all-devices', resource: 'auth', reason: 'security-revocation' });
   res.json({ success: true, message: 'All refresh tokens revoked.' });
