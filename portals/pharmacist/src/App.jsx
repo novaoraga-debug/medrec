@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   login,
-  register,
-  googleLogin,
+  submitDoctorApplication,
+  fetchApplicationStatus,
   fetchDashboard,
   confirmPrescription,
   correctPrescription,
@@ -15,13 +15,40 @@ import { PortalHeader, RoleLockedNotice, EmptyState, pageTransition, GoogleSignI
 const PORTAL_ROLE = 'pharmacist';
 const ALLOWED_ROLES = ['pharmacist'];
 
+// Client-side JWT payload decode (no verification) used only to pre-fill the
+// verification application from a Google identity. The backend always verifies.
+function decodeJwtPayload(token) {
+  try {
+    const base64 = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
+        .join('')
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const { session, saveSession, signOut } = useSession(PORTAL_ROLE);
   const [tab, setTab] = useState('signin');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [signIn, setSignIn] = useState({ email: 'pharmacist.demo@medrec.local', password: 'Password123!' });
-  const [signUp, setSignUp] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  // Verification application (staff approval only — pharmacists cannot self-register).
+  const [applyForm, setApplyForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    specialty: 'Community pharmacy',
+    licenseNumber: ''
+  });
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [applicationStatus, setApplicationStatus] = useState(null);
 
   async function handleSignIn() {
     setBusy(true); setError('');
@@ -37,34 +64,46 @@ export default function App() {
     } finally { setBusy(false); }
   }
 
-  async function handleRegister() {
+  // Pharmacist logins are created only by staff approval of a verification
+  // application, so this portal submits the application instead of registering
+  // an account (the API refuses pharmacist self-registration).
+  async function handleApply() {
     setBusy(true); setError('');
     try {
-      const data = await register({ ...signUp, role: 'pharmacist' });
-      if (!roleAllowed(data.user?.role, ALLOWED_ROLES)) {
-        setError('This portal is for pharmacists only.');
-        return;
-      }
-      saveSession(sessionFromAuth(data));
+      const formData = new FormData();
+      formData.append('role', PORTAL_ROLE);
+      Object.entries(applyForm).forEach(([key, value]) => formData.append(key, value));
+
+      const result = await submitDoctorApplication(formData);
+      setSubmittedEmail(applyForm.email.trim().toLowerCase());
+      setApplicationStatus({ status: 'pending', ...result.application });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : 'Application submission failed');
     } finally { setBusy(false); }
   }
 
-  // Google sign-in is self-service for pharmacists: an existing pharmacist signs
-  // in, a new Google account is registered as a pharmacist automatically.
-  async function handleGoogleToken(idToken) {
-    setBusy(true); setError('');
+  async function refreshApplicationStatus() {
+    if (!submittedEmail) { setError('Submit an application first, then check its status.'); return; }
     try {
-      const data = await googleLogin({ idToken, role: PORTAL_ROLE });
-      if (!roleAllowed(data.user?.role, ALLOWED_ROLES)) {
-        setError('This portal is for pharmacists only. Use the portal that matches your role.');
-        return;
-      }
-      saveSession(sessionFromAuth(data));
+      const status = await fetchApplicationStatus(submittedEmail);
+      setApplicationStatus((prev) => ({ ...prev, ...status }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
-    } finally { setBusy(false); }
+      setError(err instanceof Error ? err.message : 'Could not refresh status');
+    }
+  }
+
+  // Google cannot create a pharmacist login — the backend allows patient
+  // self-service only. The identity pre-fills the application for staff review.
+  function handleGoogleToken(idToken) {
+    const claims = decodeJwtPayload(idToken);
+    setTab('apply');
+    setError('Google accounts cannot create pharmacist logins directly. Complete the verification application — staff review your licence before the account is activated.');
+    setApplyForm((prev) => ({
+      ...prev,
+      email: claims?.email || prev.email,
+      firstName: claims?.given_name || prev.firstName,
+      lastName: claims?.family_name || prev.lastName
+    }));
   }
 
   if (!session) {
@@ -90,20 +129,32 @@ export default function App() {
                     <div className="login-status"><span className="status-pulse" /> Pharmacist portal — role locked</div>
                     <div className="panel-header">
                       <div>
-                        <p className="eyebrow">{tab === 'signin' ? 'pharmacist sign in' : 'create account'}</p>
-                        <h2>{tab === 'signin' ? 'Welcome back' : 'Register as a pharmacist'}</h2>
+                        <p className="eyebrow">{tab === 'signin' ? 'pharmacist sign in' : 'verification application'}</p>
+                        <h2>{tab === 'signin' ? 'Welcome back' : 'Apply for pharmacist access'}</h2>
                       </div>
                     </div>
 
+                    {applicationStatus && (
+                      <div className={`status-banner ${applicationStatus.status}`}>
+                        Application {applicationStatus.status} — {applicationStatus.name}
+                      </div>
+                    )}
+
                     <div className="field-group">
-                      {tab === 'register' && (
+                      {tab === 'apply' && (
                         <>
-                          <label>First name<input value={signUp.firstName} onChange={(e) => setSignUp({ ...signUp, firstName: e.target.value })} /></label>
-                          <label>Last name<input value={signUp.lastName} onChange={(e) => setSignUp({ ...signUp, lastName: e.target.value })} /></label>
+                          <label>First name<input value={applyForm.firstName} onChange={(e) => setApplyForm({ ...applyForm, firstName: e.target.value })} /></label>
+                          <label>Last name<input value={applyForm.lastName} onChange={(e) => setApplyForm({ ...applyForm, lastName: e.target.value })} /></label>
                         </>
                       )}
-                      <label>Email<input type="email" value={tab === 'signin' ? signIn.email : signUp.email} onChange={(e) => tab === 'signin' ? setSignIn({ ...signIn, email: e.target.value }) : setSignUp({ ...signUp, email: e.target.value })} /></label>
-                      <label>Password<input type="password" value={tab === 'signin' ? signIn.password : signUp.password} onChange={(e) => tab === 'signin' ? setSignIn({ ...signIn, password: e.target.value }) : setSignUp({ ...signUp, password: e.target.value })} /></label>
+                      <label>Email<input type="email" value={tab === 'signin' ? signIn.email : applyForm.email} onChange={(e) => tab === 'signin' ? setSignIn({ ...signIn, email: e.target.value }) : setApplyForm({ ...applyForm, email: e.target.value })} /></label>
+                      <label>Password<input type="password" value={tab === 'signin' ? signIn.password : applyForm.password} onChange={(e) => tab === 'signin' ? setSignIn({ ...signIn, password: e.target.value }) : setApplyForm({ ...applyForm, password: e.target.value })} /></label>
+                      {tab === 'apply' && (
+                        <>
+                          <label>Pharmacy / discipline<input value={applyForm.specialty} onChange={(e) => setApplyForm({ ...applyForm, specialty: e.target.value })} /></label>
+                          <label>Licence number<input placeholder="PHA-00000" value={applyForm.licenseNumber} onChange={(e) => setApplyForm({ ...applyForm, licenseNumber: e.target.value })} /></label>
+                        </>
+                      )}
                     </div>
 
                     {error && <div className="error-banner">{error}</div>}
@@ -112,11 +163,12 @@ export default function App() {
                       {tab === 'signin' ? (
                         <>
                           <button className="primary" onClick={handleSignIn} disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-                          <button className="secondary" onClick={() => { setTab('register'); setError(''); }}>Create account</button>
+                          <button className="secondary" onClick={() => { setTab('apply'); setError(''); }}>Apply for verification</button>
                         </>
                       ) : (
                         <>
-                          <button className="primary" onClick={handleRegister} disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
+                          <button className="primary" onClick={handleApply} disabled={busy}>{busy ? 'Submitting…' : 'Submit application'}</button>
+                          <button className="secondary" onClick={refreshApplicationStatus} disabled={!submittedEmail}>Check status</button>
                           <button className="secondary" onClick={() => { setTab('signin'); setError(''); }}>Back to sign in</button>
                         </>
                       )}
@@ -124,9 +176,13 @@ export default function App() {
 
                     <div className="auth-divider"><span>or</span></div>
                     <GoogleSignInButton
+                      label="Continue with Google to apply"
                       onToken={handleGoogleToken}
                       onError={(err) => setError(err instanceof Error ? err.message : 'Google sign-in failed')}
                     />
+                    <p className="eyebrow" style={{ marginTop: '0.5rem' }}>
+                      Pharmacist accounts are created only after staff approve your licence, so Google pre-fills the application instead of signing you in.
+                    </p>
                   </section>
                 </div>
               </div>

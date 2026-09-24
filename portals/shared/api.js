@@ -59,8 +59,9 @@ export async function fetchMe(accessToken) {
   return apiRequest('/api/auth/me', { headers: authHeaders(accessToken) });
 }
 
-// Exchange a Google ID token for a MedRec session. Only patient/pharmacist
-// roles are accepted by the backend for self-service Google sign-in.
+// Exchange a Google ID token for a MedRec session. Self-service Google sign-in is
+// limited to patients by the backend; privileged roles must use their approved
+// verification flow instead.
 export async function googleLogin({ idToken, role }) {
   return apiRequest('/api/auth/google', {
     method: 'POST',

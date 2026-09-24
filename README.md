@@ -1,14 +1,21 @@
-# MedRec — Role-Separated Portals
+# MedRec — Unified Frontend with Role-Separated Portals
 
-MedRec is now split into **four independent front-end portals**, each locked to a single
-role, plus the shared Express backend. A user who signs into the wrong portal is rejected
-with a role-lock notice — a portal only accepts its own role.
+MedRec ships a **single unified frontend** (`frontend/`, port 5173): the sign-in screen
+offers Patient, Doctor and Pharmacist roles, while the Staff/Admin card stays hidden
+behind a staff unlock code. Doctor and pharmacist accounts activate only after a
+one-time application is **approved by staff**. The four legacy role-locked portals under
+`portals/` remain available as separate Vite apps (each accepts only its own role) but
+are no longer the primary interface. Everything talks to the same Express backend.
 
 ## Architecture
 
 ```
 backend/                 Express API + JSON file store (JWT auth, roles, audit)
-portals/
+frontend/                Unified React app (5173) — PRIMARY UI
+  src/App.tsx            Role cards, Sign in / Apply once / Check status tabs,
+                         role-tailored dashboards, staff console + admin approval
+  src/styles.css         Design system, animations, responsive + print styles
+portals/                 Legacy role-locked portals (kept as alternatives)
   shared/                Code shared by every portal
     api.js               API client for all endpoints
     auth.js              Per-portal session persistence + role lock helper
@@ -18,34 +25,35 @@ portals/
   doctor/     (5182)     Doctor portal     — role: doctor
   pharmacist/ (5183)     Pharmacist portal — role: pharmacist
   staff/      (5184)     Staff/admin portal — roles: super_admin, clinic_admin, admin, staff
-frontend/                Legacy single-app UI (kept for migration)
 ```
 
-Each portal is its own Vite project with its own `index.html`, config and dependencies, so
-they can be built and deployed separately.
+The unified frontend and each portal are their own Vite project with its own `index.html`,
+config and dependencies, so they can be built and deployed separately.
 
-## Doctor verification workflow
+## Doctor & pharmacist verification workflow
 
-This is the end-to-end flow requested:
+This is the end-to-end flow requested (both privileged roles):
 
-1. **Doctor applies** — on the doctor portal, *Apply for verification* submits name, email,
-   password, specialty, licence number and document uploads to `POST /api/doctors/apply`.
+1. **Applicant applies** — from the unified app's *Apply once* tab (or the doctor portal's
+   *Apply for verification*), name, email, password, specialty and licence number go to
+   `POST /api/doctors/apply` with `role: doctor|pharmacist` (portals also upload documents).
    **No login account is created at this stage.**
-2. **Status is visible** — the doctor sees a *pending* banner and cannot sign in yet.
-   `GET /api/doctors/apply/status?email=...` powers a *Refresh status* button.
-3. **Staff reviews** — on the staff portal, *Doctor applications* lists every pending
-   request. Staff open the application to view the uploaded documents.
+2. **Status is visible** — the applicant sees a *pending* status card and cannot sign in
+   yet (login returns `401`). `GET /api/doctors/apply/status?email=...` powers *Check status*.
+3. **Staff reviews** — in the unified app's staff console (or the staff portal), the
+   application queue lists every pending request with its uploaded documents.
 4. **Staff approves** — `POST /api/admin/doctor-applications/:id/approve` **creates the
-   doctor login account**, creates the doctor record, and **generates the verification QR
-   token**. Rejecting stores a reason instead and creates no account.
-5. **Doctor signs in** — the approved doctor signs in on the doctor portal (role-locked),
-   sees their QR, and can scan/verify. Data is stored via the backend.
+   login account**; for doctors it also creates the doctor record and **generates the
+   verification QR token** (pharmacists get a login only). Rejecting stores a reason
+   instead and creates no account.
+5. **Applicant signs in** — the approved doctor signs in, sees their QR, and can
+   scan/verify; the approved pharmacist gets the dispensing queue.
 
 ## Backend endpoints added/changed
 
 | Method | Path | Auth | Purpose |
 | ------ | ---- | ---- | ------- |
-| POST | `/api/doctors/apply` | public (multipart) | Submit a verification application |
+| POST | `/api/doctors/apply` | public (multipart or JSON) | Submit a doctor/pharmacist verification application |
 | GET | `/api/doctors/apply/status` | public | Check application status by email |
 | GET | `/api/admin/doctor-applications` | admin | List applications (clinic-scoped) |
 | GET | `/api/admin/doctor-applications/:id` | admin | Application detail + documents |
@@ -58,18 +66,22 @@ admin roles) work — previously they were gated behind `requireRole('admin')`.
 
 ## Google Sign-In
 
-Patient and pharmacist portals support **Continue with Google** (self-service sign-in /
-sign-up). Doctor accounts are intentionally excluded — a Google identity there pre-fills
-the verification application instead, because doctor logins are only created after staff
-approval. Staff keep email + MFA.
+The unified frontend supports **Continue with Google** for patients (self-service sign-in /
+sign-up). Doctor and pharmacist Google identities are intentionally excluded there — the
+identity pre-fills the one-time *Apply once* form instead, because those logins are only
+created after staff approval. Staff keep email + MFA. The role-locked portals follow the
+same rule: the pharmacist portal submits the verification application instead of
+self-registering or self-serving Google.
 
 To enable it:
 
 1. Create an OAuth 2.0 **Client ID** (type *Web application*) in Google Cloud Console.
-2. Add each portal origin as an *Authorized JavaScript origin*
-   (`http://localhost:5181`, `http://localhost:5182`, `http://localhost:5183`).
-3. Set the ID in both places:
+2. Add each origin as an *Authorized JavaScript origin*
+   (`http://localhost:5173` for the unified app, `http://localhost:5181`–`5184` for portals).
+3. Set the ID where the app runs:
    - backend: `GOOGLE_CLIENT_ID` in `backend/.env` (copy from `backend/.env.example`)
+   - unified frontend: `VITE_GOOGLE_CLIENT_ID` in `frontend/.env`
+     (copy `frontend/.env.example`)
    - portals: `VITE_GOOGLE_CLIENT_ID` (copy `portals/.env.example` to `.env` in each portal,
      or set it in your shell)
 
@@ -79,11 +91,18 @@ whether Google is configured.
 
 Security rules enforced by `/api/auth/google`:
 
-- Only `patient` and `pharmacist` roles can self-serve with Google — requesting any other
-  role returns `403` (doctors are pointed to the application flow).
-- A Google login can never escalate or change an existing account's role.
-- New Google users are created with role `patient` / `pharmacist` only, with a random
-  unusable password.
+- Only the `patient` role can self-serve with Google — doctors and pharmacists get a `403`
+  pointing at the verification/approval flow, and any other role is refused.
+- A Google login can never escalate or change an existing account's role; an account that
+  already holds a privileged role cannot use Google at all ("use email and password").
+- New Google users are created with role `patient` only, with a random unusable password.
+- `POST /api/auth/register` enforces the same policy: patient self-registration succeeds,
+  while `doctor`, `pharmacist`, and admin roles return `403`. Verified clinical accounts are
+  minted only by staff approving `/api/doctors/apply`.
+
+The unified frontend additionally routes **pharmacist** Google identities through the
+*Apply once* flow (staff approval) instead of issuing a session — only patients get an
+immediate Google session there. Doctors were already excluded.
 
 ## UI
 
@@ -137,7 +156,7 @@ and request logs redact any `file_token`/`access_token` query parameter.
 
 ## Token refresh
 
-Logins return a refresh token plus `expiresInSeconds`; the portals store both and
+Logins return a refresh token plus `expiresInSeconds`; the unified app and portals store both and
 automatically refresh the access token one minute before it expires, so 15-minute sessions
 no longer drop mid-use.
 
@@ -146,18 +165,22 @@ no longer drop mid-use.
 - `login`, `register`, and `google` routes are rate limited (`authLimiter`).
 - All routes sit behind helmet (CSP), CORS, and request logging with token redaction,
   plus layered rate limits: 600 req/15 min globally, 120 req/min on `/api`.
-- Google role rules are covered by `backend/test/google-auth.test.js`.
+- Google role rules are covered by `backend/test/google-auth.test.js`, and the
+  self-registration role policy by `backend/test/registration-role-guard.test.js`.
 
 ## Running
 
 ```bash
-# 1. install everything
+# 1. install everything (backend + unified frontend + portals)
 npm run install:all
 
-# 2. backend
+# 2. backend (http://localhost:4000)
 npm run dev:backend
 
-# 3. each portal (in separate terminals) or all at once
+# 3. unified frontend (http://localhost:5173) — primary UI
+npm run dev:frontend
+
+# optional: legacy role-locked portals (each in its own terminal)
 npm run dev:patient
 npm run dev:doctor
 npm run dev:pharmacist
@@ -165,11 +188,13 @@ npm run dev:staff
 
 # or run every portal together
 npm run dev:portals
-# or portals + backend
+# or backend + frontend + portals
 npm run dev:all
 ```
 
-Set `VITE_API_URL` in a portal to point at a non-default backend.
+Set `VITE_API_URL` in `frontend/.env` (or a portal) to point at a non-default backend.
+The staff-card unlock code and Google button are configured in `frontend/.env` — see
+`frontend/.env.example` (`VITE_STAFF_UNLOCK_CODE`, `VITE_GOOGLE_CLIENT_ID`).
 
 ## Demo credentials
 
@@ -183,11 +208,16 @@ Set `VITE_API_URL` in a portal to point at a non-default backend.
 
 Staff sign-in uses TOTP MFA (`JBSWY3DPEHPK3PXP` is the seeded test secret).
 
+In the unified app, entering the staff unlock code (`SuperAdmin!2026` by default,
+overridable via `VITE_STAFF_UNLOCK_CODE`) reveals the **Staff** card; *Open staff
+console* then takes you to the MFA login above.
+
 ## Tests
 
 ```bash
 cd backend && node --test
 ```
 
-Covers the new doctor application flow: apply → pending → staff approve → account + QR,
-plus the reject and duplicate-application paths.
+20 tests covering the doctor application flow (apply → pending → staff approve →
+account + QR), the reject and duplicate-application paths, and the pharmacist
+application flow (approval creates a login only — no doctor record or QR).

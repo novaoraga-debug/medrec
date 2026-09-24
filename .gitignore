@@ -8,7 +8,10 @@ backend/uploads/
 .env.*
 !/.env.example
 !backend/.env.example
+!frontend/.env.example
 npm-debug.log*
 .DS_Store
 desktop.ini
 test-out.txt
+backend/server.log
+frontend/dev.log
