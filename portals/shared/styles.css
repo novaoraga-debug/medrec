@@ -591,18 +591,22 @@ h2 {
 
 .auth-shell {
   display: flex;
-  align-items: center;
+  /* Centring with align-items:center on a fixed min-height clips the sign-in
+     card on short viewports with no way to scroll to it. Auto block margins
+     on the layout centre the card only while there is spare space. */
+  align-items: flex-start;
   justify-content: center;
-  min-height: 80vh;
-  padding: 2rem 1rem;
+  min-height: calc(100dvh - 5.5rem);
+  padding: 2.5rem 1rem;
 }
 
 .auth-layout {
-  width: min(1280px, 100%);
+  width: min(1024px, 100%);
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 1.25rem;
+  grid-template-columns: 1fr 0.9fr;
+  gap: 1.5rem;
   align-items: stretch;
+  margin-block: auto;
 }
 
 .brand-panel {
@@ -1903,5 +1907,19 @@ main.grid-layout > .panel:nth-child(5) { animation-delay: 240ms; }
 
   .hero-art {
     padding-top: 0.75rem;
+  }
+}
+
+/* Short viewports (phone and landscape): stop reserving a fixed height so the
+   sign-in card can never be clipped, and stack the two columns. */
+@media (max-width: 768px) {
+  .auth-shell {
+    padding: 1rem 0.75rem;
+    min-height: auto;
+  }
+
+  .auth-layout {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
   }
 }
