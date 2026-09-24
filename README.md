@@ -224,9 +224,10 @@ The staff-card unlock code and Google button are configured in `frontend/.env` â
 
 Staff sign-in uses TOTP MFA (`JBSWY3DPEHPK3PXP` is the seeded test secret).
 
-In the unified app, entering the staff unlock code (`SuperAdmin!2026` by default,
-overridable via `VITE_STAFF_UNLOCK_CODE`) reveals the **Staff** card; *Open staff
-console* then takes you to the MFA login above.
+In the unified app, entering the staff unlock code reveals the **Staff** card;
+*Open staff console* then takes you to the MFA login above. Development builds
+default that code to `SuperAdmin!2026`; production builds require
+`VITE_STAFF_UNLOCK_CODE` to be set, so the value is never baked into a shipped bundle.
 
 ## Tests
 

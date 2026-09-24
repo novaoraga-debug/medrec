@@ -38,19 +38,26 @@ const samplePrescription = `Amoxicillin 500mg twice daily for 5 days\nFinish the
 
 // Unlock code that reveals the hidden Staff/Admin role card on the sign-in
 // screen. The staff console itself still requires email + password + MFA.
-// Override per environment with VITE_STAFF_UNLOCK_CODE (see frontend/.env.example);
-// the built-in default keeps local development working out of the box.
-const STAFF_UNLOCK_CODE = (import.meta.env.VITE_STAFF_UNLOCK_CODE || 'SuperAdmin!2026').trim();
+// Production builds must supply VITE_STAFF_UNLOCK_CODE (see frontend/.env.example).
+// The built-in value applies to development only, so a shipped bundle never
+// carries a usable unlock code by default.
+const STAFF_UNLOCK_CODE = (
+  import.meta.env.VITE_STAFF_UNLOCK_CODE || (import.meta.env.DEV ? 'SuperAdmin!2026' : '')
+).trim();
 
 const SESSION_STORAGE_KEY = 'medrec.session';
 const REMEMBERED_EMAIL_KEY = 'medrec.remembered-email';
 
-// Demo credentials per role, shown as a micro-hint under the sign-in form.
-const demoCredentials: Partial<Record<Role, { email: string; password: string }>> = {
-  patient: { email: 'qa.user.2026@example.com', password: 'Password123!' },
-  doctor: { email: 'doctor.demo@medrec.local', password: 'Password123!' },
-  pharmacist: { email: 'pharmacist.demo@medrec.local', password: 'Password123!' }
-};
+// Demo credentials per role, prefilled on role switch and shown as a micro-hint
+// under the sign-in form. Development only: once DEV is statically false the
+// object folds to empty so a shipped bundle carries no working credentials.
+const demoCredentials: Partial<Record<Role, { email: string; password: string }>> = import.meta.env.DEV
+  ? {
+      patient: { email: 'qa.user.2026@example.com', password: 'Password123!' },
+      doctor: { email: 'doctor.demo@medrec.local', password: 'Password123!' },
+      pharmacist: { email: 'pharmacist.demo@medrec.local', password: 'Password123!' }
+    }
+  : {};
 
 type Notice = { id: number; type: 'success' | 'error' | 'info'; message: string };
 let noticeListener: ((notice: Notice) => void) | null = null;
@@ -381,14 +388,18 @@ function HealthcareApp() {
       remembered = '';
     }
     return {
-      email: remembered || 'qa.user.2026@example.com',
-      password: 'Password123!',
+      email: remembered || (import.meta.env.DEV ? 'qa.user.2026@example.com' : ''),
+      password: import.meta.env.DEV ? 'Password123!' : '',
       firstName: 'QA',
       lastName: 'User',
       role: 'patient' as Role
     };
   });
-  const [adminLogin, setAdminLogin] = useState({ email: 'super.admin@medrec.local', password: 'SuperAdmin!2026', mfaCode: '' });
+  const [adminLogin, setAdminLogin] = useState({
+    email: import.meta.env.DEV ? 'super.admin@medrec.local' : '',
+    password: import.meta.env.DEV ? 'SuperAdmin!2026' : '',
+    mfaCode: ''
+  });
   const [adminError, setAdminError] = useState('');
   const [adminMfaRequired, setAdminMfaRequired] = useState(false);
   const [draftPrescription, setDraftPrescription] = useState(samplePrescription);
@@ -934,10 +945,14 @@ function HealthcareApp() {
     }
 
     const cleanedEmail = signIn.email.trim();
-    const email = !cleanedEmail || cleanedEmail.toLowerCase() === 'qa.user.2026@example.com'
+    const email = !cleanedEmail && import.meta.env.DEV
       ? createDemoAccountEmail(signIn.role)
       : cleanedEmail;
-    const password = signIn.password || 'Password123!';
+    const password = signIn.password || (import.meta.env.DEV ? "Password123!" : "");
+    if (!email || !password) {
+      notify("error", "Email and password are required to create an account.");
+      return;
+    }
 
     setAuthBusy(true);
     try {
@@ -1043,6 +1058,12 @@ function HealthcareApp() {
   }
 
   function handleStaffUnlock() {
+    // An unset code must never unlock anything: without this guard a blank
+    // submission would match an empty configured value.
+    if (!STAFF_UNLOCK_CODE) {
+      notify('error', 'Staff access is not configured in this build.');
+      return;
+    }
     if (unlockCode === STAFF_UNLOCK_CODE) {
       setAdminUnlocked(true);
       setUnlockOpen(false);
@@ -1479,7 +1500,9 @@ function HealthcareApp() {
                   {signIn.role === 'admin' ? (
                     <div className="field-group">
                       <p className="micro-hint">
-                        Staff sign-in uses email, password, and a one-time MFA code. Demo: super.admin@medrec.local / SuperAdmin!2026.
+                        {import.meta.env.DEV
+                          ? 'Staff sign-in uses email, password, and a one-time MFA code. Demo: super.admin@medrec.local / SuperAdmin!2026.'
+                          : 'Staff sign-in uses email, password, and a one-time MFA code.'}
                       </p>
                       <button
                         className="primary wide"
@@ -1550,9 +1573,11 @@ function HealthcareApp() {
                               Create account
                             </button>
                           </div>
-                          <p className="micro-hint">
-                            Demo: {demoCredentials[signIn.role]?.email ?? 'qa.user.2026@example.com'} / Password123!
-                          </p>
+                          {demoCredentials[signIn.role] ? (
+                            <p className="micro-hint">
+                              Demo: {demoCredentials[signIn.role]?.email} / {demoCredentials[signIn.role]?.password}
+                            </p>
+                          ) : null}
                         </div>
                       )}
 
