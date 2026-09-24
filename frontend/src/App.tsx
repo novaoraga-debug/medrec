@@ -522,7 +522,7 @@ function HealthcareApp() {
     const timer = window.setTimeout(() => {
       (async () => {
         try {
-          const data = await apiRequest<{ accessToken: string; expiresInSeconds?: number }>('/api/auth/refresh', {
+          const data = await apiRequest<{ accessToken: string; refreshToken?: string; expiresInSeconds?: number }>('/api/auth/refresh', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken })
@@ -530,7 +530,12 @@ function HealthcareApp() {
           if (cancelled) return;
           setSessionWarning('');
           setAuth((prev) => (prev
-            ? { ...prev, accessToken: data.accessToken, expiresAt: Date.now() + (data.expiresInSeconds ?? 15 * 60) * 1000 }
+            ? {
+                ...prev,
+                accessToken: data.accessToken,
+                refreshToken: data.refreshToken ?? prev.refreshToken,
+                expiresAt: Date.now() + (data.expiresInSeconds ?? 15 * 60) * 1000
+              }
             : prev));
         } catch {
           if (cancelled) return;
@@ -1050,10 +1055,26 @@ function HealthcareApp() {
   }
 
   function handleSignOut() {
-    setAuth(null);
-    clearStoredSession();
-    setSessionWarning('');
-    notify('info', 'You have been signed out.');
+    void (async () => {
+      if (auth?.accessToken && auth?.refreshToken) {
+        try {
+          await apiRequest('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${auth.accessToken}`
+            },
+            body: JSON.stringify({ refreshToken: auth.refreshToken })
+          });
+        } catch {
+          /* already invalid server-side - sign out locally regardless */
+        }
+      }
+      setAuth(null);
+      clearStoredSession();
+      setSessionWarning('');
+      notify('info', 'You have been signed out.');
+    })();
   }
 
   async function handleSignOutAll() {

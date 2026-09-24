@@ -67,6 +67,9 @@ export function useSession(portalRole) {
           saveSession({
             ...sessionRef.current,
             accessToken: result.accessToken,
+            // Rotation: the backend retires the presented refresh token, so the
+            // replacement must be persisted or the next refresh gets a 401.
+            refreshToken: result.refreshToken || refreshToken,
             expiresAt: Date.now() + (result.expiresInSeconds ? result.expiresInSeconds * 1000 : 15 * 60 * 1000)
           });
         }

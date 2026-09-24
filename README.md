@@ -160,13 +160,27 @@ Logins return a refresh token plus `expiresInSeconds`; the unified app and porta
 automatically refresh the access token one minute before it expires, so 15-minute sessions
 no longer drop mid-use.
 
+Refresh tokens are single-use: `POST /api/auth/refresh` rotates the token, retires the value
+that was presented, and returns the replacement, which the clients persist. Expired entries are
+pruned and each account keeps at most `MEDREC_MAX_REFRESH_TOKENS` live tokens (default 10).
+Signing out calls `POST /api/auth/logout`, which revokes only that session, while
+**Sign out everywhere** still calls `POST /api/auth/logout-all`.
+
+Cross-origin access is an allowlist: list the deployed portal origins in `CORS_ORIGINS`
+(comma separated). Outside production any localhost port is accepted so the four role portals
+keep working on their own dev ports.
+
 ## Auth hardening
 
 - `login`, `register`, and `google` routes are rate limited (`authLimiter`).
-- All routes sit behind helmet (CSP), CORS, and request logging with token redaction,
-  plus layered rate limits: 600 req/15 min globally, 120 req/min on `/api`.
-- Google role rules are covered by `backend/test/google-auth.test.js`, and the
-  self-registration role policy by `backend/test/registration-role-guard.test.js`.
+- All routes sit behind helmet (CSP with frame-ancestors none, X-Frame-Options DENY, COOP,
+  strict-origin-when-cross-origin referrers), the CORS allowlist, and request logging with
+  token redaction, plus layered rate limits: 600 req/15 min globally, 120 req/min on `/api`.
+- Refresh tokens rotate on use and can be revoked one session at a time, so a token stolen
+  before a refresh can no longer be replayed.
+- Google role rules are covered by `backend/test/google-auth.test.js`, the self-registration
+  role policy by `backend/test/registration-role-guard.test.js`, and rotation plus
+  single-session revocation by `backend/test/refresh-rotation.test.js`.
 
 ## Running
 

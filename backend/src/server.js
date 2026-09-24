@@ -89,14 +89,38 @@ app.use(helmet({
       'script-src': ["'self'", 'https://accounts.google.com'],
       'frame-src': ["'self'", 'https://accounts.google.com'],
       'connect-src': ["'self'", 'https://accounts.google.com'],
-      'img-src': ["'self'", 'data:', 'blob:']
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'frame-ancestors': ["'none'"]
     }
   },
   // The portals run on their own origins and load API responses (images
   // included), so cross-origin resources must be allowed.
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  // This API is never framed and never leaks a referrer to third parties.
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin' }
 }));
-app.use(cors({ origin: true, credentials: true }));
+
+// CORS allowlist: deployed portals must be listed in CORS_ORIGINS. Outside
+// production any localhost port is accepted so the four role portals keep
+// working on their own dev ports.
+const CORS_ORIGINS = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 // morgan logs the full URL; redact token query parameters so short-lived file
@@ -241,6 +265,13 @@ function issueToken(subject, payload, secret, expiresIn) {
   return jwt.sign({ ...payload, sub: subject }, secret, { expiresIn });
 }
 
+// Every refresh token carries a unique jti, so rotating within the same
+// second still yields a distinct value (JWTs are otherwise byte-identical
+// for the same subject, role, and issue second).
+function issueRefreshToken(userId, role) {
+  return issueToken(userId, { role, type: 'refresh', jti: crypto.randomUUID() }, REFRESH_SECRET, '30d');
+}
+
 function verifyAccessToken(token) {
   const payload = jwt.verify(token, JWT_SECRET);
   // File-scoped tokens (?file_token=) must never authenticate regular API calls.
@@ -250,6 +281,25 @@ function verifyAccessToken(token) {
 
 function verifyRefreshToken(token) {
   return jwt.verify(token, REFRESH_SECRET);
+}
+
+// Refresh tokens are single-use: refreshing rotates the token, retires the
+// value that was presented, and prunes anything expired so a long-lived
+// account cannot accumulate unbounded usable tokens in the store.
+const MAX_REFRESH_TOKENS = Number(process.env.MEDREC_MAX_REFRESH_TOKENS || 10);
+
+function pruneExpiredRefreshTokens(tokens) {
+  if (!Array.isArray(tokens)) return;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const decoded = jwt.decode(tokens[index]);
+    if (!decoded || typeof decoded.exp !== 'number' || decoded.exp <= nowSeconds) {
+      tokens.splice(index, 1);
+    }
+  }
+  if (tokens.length > MAX_REFRESH_TOKENS) {
+    tokens.splice(0, tokens.length - MAX_REFRESH_TOKENS);
+  }
 }
 
 function hashPassword(password) {
@@ -839,10 +889,11 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   writeData(data);
 
   const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
-  const refreshToken = issueToken(user.id, { role: user.role, type: 'refresh' }, REFRESH_SECRET, '30d');
+  const refreshToken = issueRefreshToken(user.id, user.role);
   const userRecord = sanitizeUser(user);
 
   user.refreshTokens.push(refreshToken);
+  pruneExpiredRefreshTokens(user.refreshTokens);
   writeData(data);
 
   logAccess({ actor: user.id, action: 'register-account', resource: 'users', reason: 'first-time-account-creation' });
@@ -859,9 +910,10 @@ app.post('/api/auth/login', authLimiter, (req, res) => {
   }
 
   const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
-  const refreshToken = issueToken(user.id, { role: user.role, type: 'refresh' }, REFRESH_SECRET, '30d');
+  const refreshToken = issueRefreshToken(user.id, user.role);
   if (!user.refreshTokens) user.refreshTokens = [];
   user.refreshTokens.push(refreshToken);
+  pruneExpiredRefreshTokens(user.refreshTokens);
   writeData(data);
 
   logAccess({ actor: user.id, action: 'login', resource: 'auth', reason: 'user-login' });
@@ -954,9 +1006,10 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     }
 
     const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
-    const refreshToken = issueToken(user.id, { role: user.role, type: 'refresh' }, REFRESH_SECRET, '30d');
+    const refreshToken = issueRefreshToken(user.id, user.role);
     user.refreshTokens = user.refreshTokens || [];
     user.refreshTokens.push(refreshToken);
+    pruneExpiredRefreshTokens(user.refreshTokens);
     writeData(data);
 
     logAccess({ actor: user.id, action: isNewUser ? 'google-register' : 'google-login', resource: 'auth', reason: 'oauth-authorized' });
@@ -1005,8 +1058,19 @@ app.post('/api/auth/refresh', (req, res) => {
       return res.status(401).json({ error: 'Refresh token invalid or revoked.' });
     }
 
+    // Rotation: a refresh token is single-use. Retire the value that was just
+    // presented and return its replacement, so an intercepted token cannot be
+    // replayed once the legitimate client has refreshed.
     const accessToken = issueToken(user.id, { role: user.role, email: user.email }, JWT_SECRET, '15m');
-    res.json({ accessToken });
+    const rotatedRefreshToken = issueRefreshToken(user.id, user.role);
+    const consumedAt = user.refreshTokens.indexOf(refreshToken);
+    if (consumedAt !== -1) user.refreshTokens.splice(consumedAt, 1);
+    user.refreshTokens.push(rotatedRefreshToken);
+    pruneExpiredRefreshTokens(user.refreshTokens);
+    writeData(data);
+
+    logAccess({ actor: user.id, action: 'token-refresh', resource: 'auth', reason: 'refresh-token-rotated' });
+    res.json({ accessToken, refreshToken: rotatedRefreshToken, expiresInSeconds: 15 * 60 });
   } catch (error) {
     res.status(401).json({ error: 'Refresh token expired or invalid.' });
   }
@@ -1099,6 +1163,27 @@ app.post('/api/auth/logout-all', requireAuth, (req, res) => {
   writeData(data);
   logAccess({ actor: user.id, action: 'logout-all-devices', resource: 'auth', reason: 'security-revocation' });
   res.json({ success: true, message: 'All refresh tokens revoked.' });
+});
+
+// Revoke only the refresh token presented by this device, so the other
+// sessions stay signed in. Without this, signing out locally leaves that
+// token usable server-side for its whole lifetime.
+app.post('/api/auth/logout', requireAuth, (req, res) => {
+  const data = readData();
+  const user = data.users.find((entry) => entry.id === req.user.sub);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  if (!user.refreshTokens) user.refreshTokens = [];
+  const before = user.refreshTokens.length;
+  if (req.body && req.body.refreshToken) {
+    user.refreshTokens = user.refreshTokens.filter((token) => token !== req.body.refreshToken);
+  }
+  writeData(data);
+
+  logAccess({ actor: user.id, action: 'logout-session', resource: 'auth', reason: req.body && req.body.refreshToken ? 'single-session-revocation' : 'sign-out' });
+  res.json({ success: true, revokedRefreshTokens: before - user.refreshTokens.length });
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
