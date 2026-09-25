@@ -23,7 +23,10 @@ export default function App() {
   const [tab, setTab] = useState('signin'); // signin | register
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [signIn, setSignIn] = useState({ email: 'qa.user.2026@example.com', password: 'Password123!' });
+  const [signIn, setSignIn] = useState({
+    email: import.meta.env.DEV ? 'qa.user.2026@example.com' : '',
+    password: import.meta.env.DEV ? 'Password123!' : ''
+  });
   const [signUp, setSignUp] = useState({ firstName: '', lastName: '', email: '', password: '' });
 
   async function handleSignIn() {

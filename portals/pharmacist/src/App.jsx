@@ -37,7 +37,10 @@ export default function App() {
   const [tab, setTab] = useState('signin');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [signIn, setSignIn] = useState({ email: 'pharmacist.demo@medrec.local', password: 'Password123!' });
+  const [signIn, setSignIn] = useState({
+    email: import.meta.env.DEV ? 'pharmacist.demo@medrec.local' : '',
+    password: import.meta.env.DEV ? 'Password123!' : ''
+  });
   // Verification application (staff approval only — pharmacists cannot self-register).
   const [applyForm, setApplyForm] = useState({
     firstName: '',

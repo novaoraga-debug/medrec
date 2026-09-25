@@ -42,7 +42,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
 
   // Sign-in form
-  const [signIn, setSignIn] = useState({ email: 'doctor.demo@medrec.local', password: 'Password123!' });
+  const [signIn, setSignIn] = useState({
+    email: import.meta.env.DEV ? 'doctor.demo@medrec.local' : '',
+    password: import.meta.env.DEV ? 'Password123!' : ''
+  });
 
   // Application form
   const [application, setApplication] = useState({

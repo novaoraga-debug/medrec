@@ -73,3 +73,35 @@ test('frontend source gates demo credentials map and register defaults behind DE
     'Registration fallback password must only fallback in DEV'
   );
 });
+
+test('legacy portal production builds contain zero hardcoded credentials', () => {
+  const forbiddenNeedles = [
+    'SuperAdmin!2026',
+    'Password123!',
+    'super.admin@medrec.local',
+    'qa.user.2026@example.com',
+    'doctor.demo@medrec.local',
+    'pharmacist.demo@medrec.local'
+  ];
+
+  const portalNames = ['patient', 'doctor', 'pharmacist', 'staff'];
+  for (const name of portalNames) {
+    const assetsDir = path.join(ROOT, 'portals', name, 'dist', 'assets');
+    assert.ok(fs.existsSync(assetsDir), `portals/${name}/dist/assets must exist`);
+
+    const files = fs.readdirSync(assetsDir);
+    const jsBundles = files.filter((f) => f.endsWith('.js'));
+    assert.ok(jsBundles.length > 0, `portals/${name} should have at least one JS bundle`);
+
+    for (const bundle of jsBundles) {
+      const content = fs.readFileSync(path.join(assetsDir, bundle), 'utf8');
+      for (const needle of forbiddenNeedles) {
+        assert.strictEqual(
+          content.includes(needle),
+          false,
+          `Portal bundle ${name}/${bundle} must not contain secret/credential: ${needle}`
+        );
+      }
+    }
+  }
+});
