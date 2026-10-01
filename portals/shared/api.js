@@ -82,6 +82,26 @@ export async function refreshAccessToken(refreshToken) {
   });
 }
 
+export async function logoutSession(accessToken, refreshToken) {
+  return apiRequest('/api/auth/logout', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(accessToken)
+    },
+    body: JSON.stringify({ refreshToken })
+  });
+}
+
+export async function logoutAllSessions(accessToken) {
+  return apiRequest('/api/auth/logout-all', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(accessToken)
+    }
+  });
+}
+
 export async function fetchPatient(accessToken, patientId) {
   return apiRequest(`/api/patients/${encodeURIComponent(patientId)}`, { headers: authHeaders(accessToken) });
 }

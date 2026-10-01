@@ -32,7 +32,7 @@ export function SkeletonBlock({ className = '' }) {
   return <div className={`skeleton ${className}`} aria-hidden="true" />;
 }
 
-export function PortalHeader({ title, subtitle, role, onSignOut }) {
+export function PortalHeader({ title, subtitle, role, onSignOut, onSignOutEverywhere }) {
   return (
     <header className="topbar">
       <div className="brand-lockup">
@@ -46,6 +46,11 @@ export function PortalHeader({ title, subtitle, role, onSignOut }) {
       <div className="topbar-actions">
         <span className="portal-badge">{role} portal</span>
         <button className="secondary small" onClick={onSignOut}>Sign out</button>
+        {onSignOutEverywhere && (
+          <button className="secondary small" onClick={onSignOutEverywhere} title="Revoke refresh tokens on every device">
+            Sign out everywhere
+          </button>
+        )}
       </div>
     </header>
   );

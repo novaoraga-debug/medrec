@@ -33,7 +33,7 @@ function decodeJwtPayload(token) {
 }
 
 export default function App() {
-  const { session, saveSession, signOut } = useSession(PORTAL_ROLE);
+  const { session, saveSession, signOut, signOutEverywhere } = useSession(PORTAL_ROLE);
   const [tab, setTab] = useState('signin');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -200,10 +200,10 @@ export default function App() {
     return <div className="portal-shell"><RoleLockedNotice portalRole="pharmacist" onSignOut={signOut} /></div>;
   }
 
-  return <PharmacistWorkspace session={session} onSignOut={signOut} />;
+  return <PharmacistWorkspace session={session} onSignOut={signOut} onSignOutEverywhere={signOutEverywhere} />;
 }
 
-function PharmacistWorkspace({ session, onSignOut }) {
+function PharmacistWorkspace({ session, onSignOut, onSignOutEverywhere }) {
   const token = session.accessToken;
   const [dashboard, setDashboard] = useState({});
   const [status, setStatus] = useState('');
@@ -282,7 +282,13 @@ function PharmacistWorkspace({ session, onSignOut }) {
 
   return (
     <div className="app-shell role-pharmacist">
-      <PortalHeader title="Prescription verification" subtitle="Dispense review workspace" role="pharmacist" onSignOut={onSignOut} />
+      <PortalHeader
+        title="Prescription verification"
+        subtitle="Dispense review workspace"
+        role="pharmacist"
+        onSignOut={onSignOut}
+        onSignOutEverywhere={onSignOutEverywhere}
+      />
 
       <div className="care-flow">
         {['Prescription queue', 'Safety review', 'Dispense decision'].map((step, index) => (

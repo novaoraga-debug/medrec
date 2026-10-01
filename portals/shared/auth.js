@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { refreshAccessToken } from './api.js';
+import { refreshAccessToken, logoutSession, logoutAllSessions } from './api.js';
 
 // Normalize a login/register/google response into a stored session.
 export function sessionFromAuth(data) {
@@ -47,7 +47,29 @@ export function useSession(portalRole) {
     }
   }, [storageKey]);
 
-  const signOut = useCallback(() => saveSession(null), [saveSession]);
+  const signOut = useCallback(async () => {
+    const current = sessionRef.current;
+    if (current?.accessToken && current?.refreshToken) {
+      try {
+        await logoutSession(current.accessToken, current.refreshToken);
+      } catch {
+        // network or server error; discard client credentials regardless
+      }
+    }
+    saveSession(null);
+  }, [saveSession]);
+
+  const signOutEverywhere = useCallback(async () => {
+    const current = sessionRef.current;
+    if (current?.accessToken) {
+      try {
+        await logoutAllSessions(current.accessToken);
+      } catch {
+        // discard local credentials even if request failed
+      }
+    }
+    saveSession(null);
+  }, [saveSession]);
 
   // Auto-refresh the access token one minute before it expires so portals do
   // not drop the user mid-session (access tokens live for 15 minutes).
@@ -83,7 +105,7 @@ export function useSession(portalRole) {
     return () => clearTimeout(timer);
   }, [session, saveSession]);
 
-  return { session, saveSession, signOut };
+  return { session, saveSession, signOut, signOutEverywhere };
 }
 
 // Returns true when the signed-in user matches the role a portal is locked to.

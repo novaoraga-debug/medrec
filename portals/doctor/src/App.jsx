@@ -36,7 +36,7 @@ function decodeJwtPayload(token) {
 }
 
 export default function App() {
-  const { session, saveSession, signOut } = useSession(PORTAL_ROLE);
+  const { session, saveSession, signOut, signOutEverywhere } = useSession(PORTAL_ROLE);
   const [mode, setMode] = useState('signin'); // signin | apply
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -167,7 +167,7 @@ export default function App() {
   }
 
   return (
-    <DoctorWorkspace session={session} onSignOut={signOut} />
+    <DoctorWorkspace session={session} onSignOut={signOut} onSignOutEverywhere={signOutEverywhere} />
   );
 }
 
@@ -337,7 +337,7 @@ function ApplyScreen({ application, setApplication, documents, setDocuments, onS
   );
 }
 
-function DoctorWorkspace({ session, onSignOut }) {
+function DoctorWorkspace({ session, onSignOut, onSignOutEverywhere }) {
   const token = session.accessToken;
   const [dashboard, setDashboard] = useState({});
   const [qr, setQr] = useState(null);
@@ -466,6 +466,7 @@ function DoctorWorkspace({ session, onSignOut }) {
         subtitle="Verified clinician workspace"
         role="doctor"
         onSignOut={onSignOut}
+        onSignOutEverywhere={onSignOutEverywhere}
       />
 
       <div className="care-flow">

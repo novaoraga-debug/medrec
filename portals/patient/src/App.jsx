@@ -19,7 +19,7 @@ const PORTAL_ROLE = 'patient';
 const ALLOWED_ROLES = ['patient'];
 
 export default function App() {
-  const { session, saveSession, signOut } = useSession(PORTAL_ROLE);
+  const { session, saveSession, signOut, signOutEverywhere } = useSession(PORTAL_ROLE);
   const [tab, setTab] = useState('signin'); // signin | register
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -147,10 +147,10 @@ export default function App() {
     return <div className="portal-shell"><RoleLockedNotice portalRole="patient" onSignOut={signOut} /></div>;
   }
 
-  return <PatientWorkspace session={session} onSignOut={signOut} />;
+  return <PatientWorkspace session={session} onSignOut={signOut} onSignOutEverywhere={signOutEverywhere} />;
 }
 
-function PatientWorkspace({ session, onSignOut }) {
+function PatientWorkspace({ session, onSignOut, onSignOutEverywhere }) {
   const token = session.accessToken;
   const [dashboard, setDashboard] = useState({});
   const [consentForm, setConsentForm] = useState({ patientId: 'PT-1001', provider: 'Dr. Priya Shah', purpose: 'Cardiology referral summary' });
@@ -234,7 +234,13 @@ function PatientWorkspace({ session, onSignOut }) {
 
   return (
     <div className="app-shell role-patient">
-      <PortalHeader title="Your health overview" subtitle="Consent-aware patient workspace" role="patient" onSignOut={onSignOut} />
+      <PortalHeader
+        title="Your health overview"
+        subtitle="Consent-aware patient workspace"
+        role="patient"
+        onSignOut={onSignOut}
+        onSignOutEverywhere={onSignOutEverywhere}
+      />
 
       {status && <div className="status-banner approved">{status}</div>}
 
