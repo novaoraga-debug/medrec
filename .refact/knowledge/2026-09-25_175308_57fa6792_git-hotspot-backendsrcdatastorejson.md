@@ -6,7 +6,7 @@ tags:
 - git
 - hotspot
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-10-06
 filenames:
 - backend/src/data/store.json
 links: []
@@ -14,7 +14,7 @@ kind: code
 status: proposed
 superseded_by: null
 deprecated_at: null
-review_after: 2026-09-25
+review_after: 2026-10-06
 source_chat_id: null
 created_at: 2026-09-25T12:23:08.516056+00:00
 summary: null

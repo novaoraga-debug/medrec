@@ -27,6 +27,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const HOST = process.env.HOST || undefined;
 const JWT_SECRET = process.env.JWT_SECRET || 'replace-me-dev-secret';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'replace-me-dev-refresh';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'local-dev-google-client';
@@ -1987,7 +1988,7 @@ module.exports = {
 };
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, HOST, () => {
     console.log(`MedRec backend running on http://localhost:${PORT}`);
   });
 }
