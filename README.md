@@ -32,13 +32,15 @@ config and dependencies, so they can be built and deployed separately.
 
 ## Run locally on Windows
 
-Build `MedRec.exe` with Windows PowerShell by running `.\build-launcher.ps1` from the
-project folder. Double-click the resulting executable to start the unified app and open
-it at `http://127.0.0.1:5173`. The launcher installs backend and frontend dependencies
-on first run if needed. Node.js must be installed and available on `PATH`; internet access
-is needed for that first dependency install. Keep the launcher window open while using the
-app and press Ctrl+C in it to stop the local services. Runtime logs are saved under
-`%LOCALAPPDATA%\MedRec\logs`.
+Download the repository as a ZIP and extract it, then double-click
+`download\MedRec.exe` to start the unified app and open it at `http://127.0.0.1:5173`.
+The executable is a launcher and needs the extracted project files beside its `download`
+folder; downloading the `.exe` alone is not sufficient. To rebuild it, run
+`.\build-launcher.ps1` in Windows PowerShell from the project folder. The launcher installs
+backend and frontend dependencies on first run if needed. Node.js must be installed and
+available on `PATH`; internet access is needed for that first dependency install. Keep the
+launcher window open while using the app and press Ctrl+C in it to stop the local services.
+Runtime logs are saved under `%LOCALAPPDATA%\MedRec\logs`.
 
 The launcher binds both services to loopback, so this entry point is available only on
 the same computer. It runs the development frontend; do not use it as a public deployment.

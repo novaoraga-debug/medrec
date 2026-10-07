@@ -15,11 +15,16 @@ internal static class MedRecLauncher
 
     private static int Main(string[] args)
     {
-        string root = AppDomain.CurrentDomain.BaseDirectory;
-        if (!File.Exists(Path.Combine(root, "package.json")) ||
-            !File.Exists(Path.Combine(root, "backend", "src", "server.js")))
+        string executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        string root = executableDirectory;
+        while (!IsProjectRoot(root) && Directory.GetParent(root) != null)
         {
-            Console.Error.WriteLine("MedRec.exe must be in the MedRec project folder.");
+            root = Directory.GetParent(root).FullName;
+        }
+
+        if (!IsProjectRoot(root))
+        {
+            Console.Error.WriteLine("Run download\\MedRec.exe from an extracted MedRec project folder.");
             return 1;
         }
 
@@ -116,12 +121,19 @@ internal static class MedRecLauncher
                 Console.WriteLine("Node.js " + version + " found.");
                 return 0;
             }
+
         }
         catch (Exception error)
         {
             Console.Error.WriteLine("Node.js is required and must be on PATH: " + error.Message);
             return 1;
         }
+    }
+
+    private static bool IsProjectRoot(string path)
+    {
+        return File.Exists(Path.Combine(path, "package.json")) &&
+               File.Exists(Path.Combine(path, "backend", "src", "server.js"));
     }
 
     private static bool EnsureDependencies(string root)
