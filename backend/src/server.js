@@ -40,7 +40,12 @@ const ADMIN_SESSION_TTL_SECONDS = 45 * 60;
 const ADMIN_ALERT_WEBHOOK_URL = process.env.ADMIN_ALERT_WEBHOOK_URL || '';
 const ADMIN_ATTEMPT_TRACKER = new Map();
 
-const uploadDir = path.join(__dirname, '../uploads');
+const uploadDir = process.env.MEDREC_UPLOAD_DIR
+  ? path.resolve(process.env.MEDREC_UPLOAD_DIR)
+  : path.join(__dirname, '../uploads');
+const staticDir = process.env.MEDREC_STATIC_DIR
+  ? path.resolve(process.env.MEDREC_STATIC_DIR)
+  : path.join(__dirname, '../../frontend');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -173,10 +178,10 @@ const authLimiter = rateLimit({
 app.use(globalLimiter);
 app.use('/api', auditLimiter);
 
-app.use(express.static(path.join(__dirname, '../../frontend')));
+app.use(express.static(staticDir));
 
 app.get('/', (_, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+  res.sendFile(path.join(staticDir, 'index.html'));
 });
 
 app.use((req, _, next) => {

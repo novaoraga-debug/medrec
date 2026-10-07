@@ -1,12 +1,8 @@
-# Download MedRec for Windows
+﻿# Download MedRec for Windows
 
-Download the repository ZIP from GitHub and extract it first. Then run
-`MedRec/download/MedRec.exe` from the extracted folder.
+Download [`MedRec.exe`](MedRec.exe) (click *Download raw file* on GitHub) and double-click it.
 
-`MedRec.exe` is a local launcher, not a standalone copy of the application. It needs
-the `backend` and `frontend` folders from the extracted project. Node.js must be
-installed and available on `PATH`; the first launch installs the app dependencies and
-requires internet access.
-
-To stop the local services, press Ctrl+C in the launcher window. The app is available
-on that computer at <http://127.0.0.1:5173>.
+It is a standalone portable desktop app - no Node.js, install step, or project files
+needed. Data is stored in `%APPDATA%\MedRec`, and the app is reachable only from your own
+computer. The file is unsigned, so Windows SmartScreen may show a warning: choose
+*More info > Run anyway*.

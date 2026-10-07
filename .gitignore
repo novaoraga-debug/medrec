@@ -1,6 +1,8 @@
 node_modules
 frontend/dist
 portals/*/dist
+desktop/build/
+desktop/dist/
 backend/src/data/store.json
 backend/src/data/store.json.*.tmp
 backend/uploads/

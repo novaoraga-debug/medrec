@@ -6,7 +6,7 @@ tags:
 - git
 - pattern
 created: 2026-09-25
-updated: 2026-10-06
+updated: 2026-10-07
 filenames:
 - README.md
 - backend/src/server.js
@@ -15,7 +15,7 @@ kind: pattern
 status: proposed
 superseded_by: null
 deprecated_at: null
-review_after: 2026-10-06
+review_after: 2026-10-07
 source_chat_id: null
 created_at: 2026-09-25T12:23:08.580904100+00:00
 summary: null

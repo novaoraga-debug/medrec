@@ -30,20 +30,18 @@ portals/                 Legacy role-locked portals (kept as alternatives)
 The unified frontend and each portal are their own Vite project with its own `index.html`,
 config and dependencies, so they can be built and deployed separately.
 
-## Run locally on Windows
+## Run locally on Windows (desktop app)
 
-Download the repository as a ZIP and extract it, then double-click
-`download\MedRec.exe` to start the unified app and open it at `http://127.0.0.1:5173`.
-The executable is a launcher and needs the extracted project files beside its `download`
-folder; downloading the `.exe` alone is not sufficient. To rebuild it, run
-`.\build-launcher.ps1` in Windows PowerShell from the project folder. The launcher installs
-backend and frontend dependencies on first run if needed. Node.js must be installed and
-available on `PATH`; internet access is needed for that first dependency install. Keep the
-launcher window open while using the app and press Ctrl+C in it to stop the local services.
-Runtime logs are saved under `%LOCALAPPDATA%\MedRec\logs`.
+Download [`download/MedRec.exe`](download/MedRec.exe) and double-click it. It is a
+self-contained portable desktop app: it bundles the backend and the built unified UI, so
+Node.js, `npm install`, and the rest of the repository are **not** required. Data
+(accounts, records, uploads) is stored per Windows user in `%APPDATA%\MedRec`, and the
+secrets are generated randomly on first run. The app listens on `127.0.0.1` only.
 
-The launcher binds both services to loopback, so this entry point is available only on
-the same computer. It runs the development frontend; do not use it as a public deployment.
+To rebuild the executable from source, run `npm install` then `npm run dist` inside
+`desktop/`; the output is `desktop/dist/MedRec.exe`. The first build downloads Electron.
+The executable is unsigned, so Windows SmartScreen may ask for confirmation on first run.
+It runs the development demo data set; do not use it as a public deployment.
 
 ## Doctor & pharmacist verification workflow
 

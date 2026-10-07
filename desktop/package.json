@@ -1,0 +1,50 @@
+{
+  "name": "medrec-desktop",
+  "productName": "MedRec",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MedRec desktop app",
+  "main": "main.js",
+  "scripts": {
+    "prepare:app": "node scripts/prepare.js",
+    "start": "npm run prepare:app && electron .",
+    "dist": "npm run prepare:app && electron-builder --win portable"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "google-auth-library": "^11.1.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.4.0",
+    "otplib": "^13.5.0",
+    "qrcode": "^1.5.4",
+    "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.medrec.desktop",
+    "productName": "MedRec",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "build/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "MedRec.exe"
+    }
+  }
+}
